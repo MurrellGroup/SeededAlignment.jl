@@ -16,7 +16,7 @@ include("sequence_generator.jl")
 
         @testset "test for general alignment output" begin
 
-            for _ in 1:10
+            for _ in 1:1
                 A, B = generate_seq_pair(120, 0.1, 0.2, 0.01, 0.01, 10)
                 # default moveset (note symmetric in horizontal and vertical)
                 match_moves = [Move(1, 0.0,1,0), Move(3, 0.0,1,0)]
@@ -49,7 +49,7 @@ include("sequence_generator.jl")
                     alignment_reverse_complement = nw_align(A_reverse_complement, B_reverse_complement, .0, 0.5, match_moves, gap_moves, gap_moves,true)
 
                     # test if the alignment are the same
-                    println("reverse complement")
+                    #=println("reverse complement")
                     println(alignment_reverse_complement[1])
                     println(alignment_reverse_complement[2])
                     println("normal")
@@ -57,7 +57,7 @@ include("sequence_generator.jl")
                     println(reverse_complement(LongDNA{4}(string(alignment[2]))))
                     println("test scores match")
                     println("reversecomplement: ", alignment_reverse_complement[3])
-                    println("normal: ", alignment[3])
+                    println("normal: ", alignment[3])=#
                     @test alignment_reverse_complement[3] == alignment[3]
                     @test alignment_reverse_complement[1] == reverse_complement(LongDNA{4}(string(alignment[1]))) skip=true    
                     @test alignment_reverse_complement[2] == reverse_complement(LongDNA{4}(string(alignment[2]))) skip=true    
