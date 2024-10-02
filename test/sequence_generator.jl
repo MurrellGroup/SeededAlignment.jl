@@ -1,6 +1,3 @@
-using BioSequences
-using Distributions
-
 function generate_seq_pair(seq_len::Int64, long_indel_frequency::Float64, triple_indel_frequency::Float64, substitution_frequency::Float64, frameshift_frequency::Float64, long_length::Int64)
     seq = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), seq_len)
     dna = LongDNA{4}("ACGT")

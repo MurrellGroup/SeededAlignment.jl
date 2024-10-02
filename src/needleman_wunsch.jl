@@ -1,47 +1,34 @@
-using BioSequences
-
 struct Move
-    step::Int64
+    step::Int
     score::Float64
+
     # refers to readingFrame of top sequence
-    horizontal_stride::Int64
-    horizontal_phase::Int64
+    horizontal_stride::Int
+    horizontal_phase::Int
+
     # refers to readingFrame of bottom sequence
-    vertical_stride::Int64
-    vertical_phase::Int64
+    vertical_stride::Int
+    vertical_phase::Int
+
     # allows moves to be extended from 
     extensionAble::Bool
-
-    # moves not considering stride and phase
-    Move(step::Int64,score::Float64) = new(step,score,1,0,1,0,false)
-    Move(step::Int64,score::Float64,extensionAble::Bool) = new(step,score,1,0,1,0,extensionAble)
-    # moves that assume both sequences have the same reading frame # TODO check this thinking is correct
-    Move(step::Int64,score::Float64,stride::Int64,phase::Int64) = new(step,score,stride,phase,stride,phase,false)
-    Move(step::Int64,score::Float64,stride::Int64,phase::Int64,extensionAble::Bool) = new(step,score,stride,phase,stride,phase,false)
-    # normal definition 
-    Move(step::Int64,score::Float64,horizontal_stride::Int64,horizontal_phase::Int64,vertical_stride::Int64,vertical_phase::Int64,
-        extensionAble::Bool) = new(step,score,horizontal_stride,horizontal_phase,vertical_stride,vertical_phase,extensionAble)
 end
 
+# moves that assume both sequences have the same reading frame # TODO check this thinking is correct
+Move(step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::Bool=false) =
+    Move(step, score, stride, phase, stride, phase, extensionAble)
+
+Move(step::Int64, score::Float64, extensionAble::Bool=false) = Move(step, score, 1, 0, extensionAble)
 
 # Convert NucleicAcid to integer A -> 1, C -> 2, G -> 3, T -> 4
-function toInt(x::NucleicAcid)
-    trailing_zeros(reinterpret(UInt8,x)) + 1
-end
+toInt(x::NucleicAcid) = trailing_zeros(reinterpret(UInt8, x)) + 1
 
-function simple_match_penalty_matrix(match_score, mismatch_score)
-    m = zeros(4, 4)
-    for i in 1:4, j in 1:4
-        if i == j
-            m[i, j] = match_score
-        else
-            m[i, j] = mismatch_score
-        end
-    end
+function simple_match_penalty_matrix(match_score, mismatch_score, n=4)
+    m = fill(mismatch_score, n, n)
+    m[diagind(m)] .= match_score
     return m
 end
 
-# match and mismatch matrix
 function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score::Float64, mismatch_score::Float64, 
                 match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, testMode=false::Bool) 
 
@@ -54,7 +41,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
 
     n, m = length(A), length(B)
 
-    #Margins in the dp_matrix streamlines the code by avoiding boundschecking
+    #Margins in the dp_matrix eliminates branching by avoiding boundschecking
     column_offset = maximum(k -> k.step, vcat(match_moves, hgap_moves)) + 1
     row_offset = maximum(k -> k.step, vcat(match_moves, vgap_moves)) + 1
 

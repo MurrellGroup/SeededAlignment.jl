@@ -1,9 +1,4 @@
-include("needleman_wunsch.jl")
-include("custom_2D_stats.jl")
-using BioSequences
-using Kmers
-
-function getCorrelationScore(s::SampleMetrics2D)
+function CorrelationScore(s::SampleMetrics)
     return sqrt(s.n) * s.correlation
 end
 
@@ -94,7 +89,7 @@ function select_max_correlation_kmer_path(kmerMatches)
     matchCount = length(kmerMatches)
     remaining_matches = matchCount
     deletionFlags = BitArray([0 for i in 1:matchCount])
-    kmerMetrics = GetSampleMetrics2D(map(x -> x.posA, kmerMatches), map(x -> x.posB, kmerMatches))
+    kmerMetrics = SampleMetrics(map(x -> x.posA, kmerMatches), map(x -> x.posB, kmerMatches))
     corScore = CorrelationScore(kmerMetrics)
     deletion_candidates = Array{Tuple{Float64, Int64}}(undef, matchCount)
     pruning_steps = 10
@@ -108,7 +103,7 @@ function select_max_correlation_kmer_path(kmerMatches)
         for j in 1 : matchCount
             if !deletionFlags[j]
                 kmer = kmerMatches[j]
-                deletion_candidates[j] = (CorrelationScore(RemoveVector(kmerMetrics, kmer.posA, kmer.posB)), j)
+                deletion_candidates[j] = (CorrelationScore(remove_point(kmerMetrics, kmer.posA, kmer.posB)), j)
             end
         end
         max_pruning_num = floor(Int64,remaining_matches*max_pruning_fraction + 1.0)

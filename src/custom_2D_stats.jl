@@ -1,39 +1,32 @@
-using LinearAlgebra
-
-mutable struct SampleMetrics2D
-    n::Int64
-    meanX::Float64
-    meanY::Float64
-    dotXY::Float64
-    nVarX::Float64
-    nVarY::Float64
-    correlation::Float64
-    SampleMetrics2D() = new()
+struct SampleMetrics{T<:Real}
+    n::Int
+    meanX::T
+    meanY::T
+    nVarX::T
+    nVarY::T
+    dotXY::T
+    correlation::T
 end
 
-function GetSampleMetrics2D(X::Array{Int}, Y::Array{Int})
-    if length(X) != length(Y)
-        error("Vectors must be of equal length.")
-    end
-    s = SampleMetrics2D()
-    s.n = length(X)
-    s.meanX = sum(X) / s.n
-    s.meanY = sum(Y) / s.n
-    s.dotXY = dot(X, Y)
-    s.nVarX = sum(map(x -> (x - s.meanX)^2, X)) #matchCount * variance of A
-    s.nVarY = sum(map(y -> (y - s.meanY)^2, Y)) #matchCount * variance of B
-    s.correlation = (s.dotXY - s.n * s.meanX * s.meanY) / sqrt(s.nVarX * s.nVarY)
-    return s
+function SampleMetrics(X::Vector{<:Integer}, Y::Vector{<:Integer})
+    length(X) == length(Y) || error("Vectors must be of equal length.")
+    n = length(X)
+    meanX = sum(X) / n
+    meanY = sum(Y) / n
+    nVarX = sum(abs2, X .- meanX) #matchCount * variance of A
+    nVarY = sum(abs2, Y .- meanY) #matchCount * variance of B
+    dotXY = dot(X, Y)
+    correlation = (dotXY - n * meanX * meanY) / sqrt(nVarX * nVarY)
+    return SampleMetrics(n, meanX, meanY, nVarX, nVarY, dotXY, correlation)
 end
 
-function RemoveVector(s::SampleMetrics2D, x, y)
-    modS = SampleMetrics2D()
-    modS.n = s.n - 1
-    modS.meanX = (s.n * s.meanX - x) / modS.n
-    modS.meanY = (s.n * s.meanY - y) / modS.n
-    modS.dotXY = s.dotXY - x*y
-    modS.nVarX = s.nVarX - (s.n / modS.n) * (x - s.meanX)^2 #newMatchCount * new variance of A
-    modS.nVarY = s.nVarY - (s.n / modS.n) * (y - s.meanY)^2 #newMatchCount * new variance of B
-    modS.correlation = (modS.dotXY - modS.n * modS.meanX * modS.meanY) / sqrt(modS.nVarX * modS.nVarY)
-    return modS
+function remove_point(s::SampleMetrics, x::Integer, y::Integer)
+    n = s.n - 1
+    meanX = (s.n * s.meanX - x) / n
+    meanY = (s.n * s.meanY - y) / n
+    nVarX = s.nVarX - (s.n / n) * (x - s.meanX)^2 #newMatchCount * new variance of A
+    nVarY = s.nVarY - (s.n / n) * (y - s.meanY)^2 #newMatchCount * new variance of B
+    dotXY = s.dotXY - x*y
+    correlation = (dotXY - n * meanX * meanY) / sqrt(nVarX * nVarY)
+    return SampleMetrics(n, meanX, meanY, nVarX, nVarY, dotXY, correlation)
 end
