@@ -21,7 +21,6 @@ for iseq in 1:numOfSequence
    AA_seqs[iseq] = translate(ungap(LongDNA{4}(refAndseqs[iseq+1])))
 end
 
-#NOTE that there is at least one single indel which might screw reading frame if mutate
 # add some noise into sequences (not reference)
 for i in 1:length(seqs)-1
     seqs[i] = mutateSequence(seqs[i])
@@ -38,7 +37,6 @@ function msa_ref_alignment(ref, seqs)
         hor_moves =  [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0,true)]
         vert_moves = [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0,true)]
         aligned_ref, aligned_seq = seed_chain_align(ref, ungap(seqs[seqId]), 0.0, 0.5, match_moves, vert_moves, hor_moves, 0.98*(2.0/3), 21)
-
         # fix readingframes
         println(seqId)
         fixed_aligned_seq = fix_alignment_readingframe(aligned_ref,aligned_seq)
@@ -47,13 +45,11 @@ function msa_ref_alignment(ref, seqs)
     return alignment
 end
 
-#TODO fix indel issues occuring at the last codon. 
+ 
 # NOTE We assume the readingFrame is 0 mod 3
 function fix_alignment_readingframe(aligned_ref,aligned_seq)
-    # find all single gaps and get their index. Once we have that we insert N in order unsure of how to fix...
     indelDict = Dict()
     N_codon = LongDNA{4}("AAC")
-
     # find all single indels, -1 deletion, 1 insertion
     for i in 1:length(aligned_seq)
         # first codon
@@ -73,7 +69,6 @@ function fix_alignment_readingframe(aligned_ref,aligned_seq)
             if aligned_ref[i] == DNA_Gap && !(aligned_ref[end-2] == DNA_Gap && aligned_ref[end-1] == DNA_Gap && aligned_ref[end] == DNA_Gap)
                 indelDict[i] = 1
             end
-
         # any other codon
         else
             if (aligned_seq[i] == DNA_Gap) && !(aligned_seq[i+1] == DNA_Gap || aligned_seq[i-1] == DNA_Gap)
