@@ -32,11 +32,12 @@ NOTE: The sequences (ungapped) might not be preserved by the alignment by the cl
 function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::MoveSet, score_params::ScoreScheme)
     cleaned_codon_alignment = Vector{LongDNA{4}}(undef, length(seqs)+1)
     # perform pairwise SeededAlignment for each sequence
-    aligned_seqs, aligned_refs = align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::MoveSet, score_params::ScoreScheme)
+    aligned_refs, aligned_seqs = align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::MoveSet, score_params::ScoreScheme)
     # clean indels which violate the reference readingFrame
     cleaned_codon_alignment[1] = ref
-    cleaned_codon_alignment[2:end] = clean_alignment_readingframe.(aligned_refs,aligned_seqs)
-
+    for i in 1:length(seqs)
+        cleaned_codon_alignment[i+1] = clean_alignment_readingframe(aligned_refs[i],aligned_seqs[i])
+    end
     return cleaned_codon_alignment
 end
 

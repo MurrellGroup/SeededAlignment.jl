@@ -9,6 +9,7 @@ end
 
 """ 
     nw_align(A::LongDNA{4},B::LongDNA{4},moveset::MoveSet,scoreScheme::ScoreScheme)
+    
     Takes two ungapped LongDNA{4} sequences and computes an optimal pairwise alignment 
     with respect to the moveset and the scoreScheme. 
 
