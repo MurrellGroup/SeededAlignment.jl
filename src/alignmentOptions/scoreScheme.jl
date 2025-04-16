@@ -1,11 +1,11 @@
 """
     ScoreScheme
 
-Scoring parameters used for codon-aware sequence alignment.
+A struct for storing scoring parameters used for sequence alignment.
 
 # Fields
-- `match_score::Float64`: Score (typically ≤ 0) awarded for matching codons. Lower is better.
-- `mismatch_score::Float64`: Penalty for codon mismatches. Higher values penalize substitutions more strongly.
+- `match_score::Float64`: Score (typically ≤ 0) awarded for matching nucleotide. Lower is better.
+- `mismatch_score::Float64`: Penalty for nucleotide mismatches. Higher values penalize substitutions more strongly.
 - `extension_score::Float64`: Cost to extend a gap (indel). Affects how gaps are penalized during alignment.
 
 - `edge_ext_begin::Bool`: If `true`, allows gaps to be extended at the **beginning** of sequences.
@@ -14,7 +14,7 @@ Scoring parameters used for codon-aware sequence alignment.
 - `kmerlength::Int64`: Length of k-mers used for seeding alignments (if applicable). Ignored if no seeding is used.
 
 # Description
-`ScoreScheme` defines how matches, mismatches, and gaps are scored during codon-level sequence alignment. It also controls whether edge gaps can be extended and optionally includes a `kmerlength` for seed-based aligners.
+`ScoreScheme` defines how matches, mismatches, and gaps are scored during nucleotide-level sequence alignment. 
 
 This struct is typically passed to functions like `seed_chain_align` or `msa_codon_align`.
 """
@@ -28,8 +28,29 @@ struct ScoreScheme
 	# (opt arg) if seeding
 	kmerlength::Int64
 end
+"""
+	ScoreScheme(; match_score=0.0, mismatch_score=0.5,extension_score=0.1,edge_ext_begin=true,edge_ext_end=true,kmerlength=21)
 
+Create a new `ScoreScheme` using keyword arguments.
 
+# keyword arguments
+- `match_score::Float64=0.0`: Score (typically ≤ 0) awarded for matching nucleotide. Lower is better.
+- `mismatch_score::Float64=0.5`: Penalty for nucleotide mismatches. Higher values penalize substitutions more strongly.
+- `extension_score::Float64=0.1`: Cost to extend a gap (indel). Affects how gaps are penalized during alignment.
+
+- `edge_ext_begin::Bool=true`: If `true`, allows gaps to be extended at the **beginning** of sequences.
+- `edge_ext_end::Bool=true`: If `true`, allows gaps to be extended at the **end** of sequences.
+
+- `kmerlength::Int64=21`: Length of k-mers used for seeding alignments (if applicable). Ignored if no seeding is used.
+
+# example
+```julia
+score_params = ScoreScheme(extension_score = 0.3, mismatch_score = 0.7) # (everything else will be keept at default values)
+```
+"""
+function ScoreScheme(; match_score=0.0, mismatch_score=0.5,extension_score=0.1,edge_ext_begin=true,edge_ext_end=true,kmerlength=21)
+	return ScoreScheme(match_score,mismatch_score,extension_score,edge_ext_begin,edge_ext_end,kmerlength)
+end
 """
     std_codon_scoring()
 

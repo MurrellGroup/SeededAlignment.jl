@@ -31,17 +31,36 @@ using SeededAlignment
 seq_names, dna_seqs = read_fasta("example.fasta")
 # choose a reference sequence with trusted reading frame
 ref_seq = dna_seqs[1]
+moveset = std_codon_moveset()
+scoreScheme = std_codon_scoring()
 # produce a codon alignment based on the reference sequence reading frame
-alignment = codon_ref_aligner(ref_seq, dna_seqs[2:end])
+alignment = msa_codon_align(ref_seq,dna_seqs[2:end], moveset, scoreScheme)
 # write alignment to fasta file
 write_fasta("example_output.fasta", alignment, seq_names = seq_names)
 ```
 
-We can customize the aligner by specifying a MoveSet and a ScoringScheme.
+We can specifying custom a MoveSet and ScoringScheme to guide the alignment.
 
+```Julia
+using SeededAlignment
+
+# read in dna_sequences
+seq_names, dna_seqs = read_fasta("example.fasta")
+# choose a reference sequence with trusted reading frame
+ref_seq = dna_seqs[1]
+
+# customizing moveset
+match_moves = [Move(1,.0)]
+hor_moves =  [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true)]
+vert_moves = [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true)]
+moveset = MoveSet(match_moves,hor_moves,vert_moves)
+
+# customizing scoreScheme
+score_params = ScoreScheme(match_score = -0.5, mismatch_score = 1.3 extension_score = 0.7, kmerlength = 24)
+# NOTE: left out fields are kept at default values. Check documentation of ScoreScheme to see default values. 
+
+# produce a codon alignment based on the reference sequence reading frame
+alignment = msa_codon_align(ref_seq, dna_seqs[2:end], moveset, score_params)
+# write alignment to fasta file
+write_fasta("example_output.fasta", alignment, seq_names = seq_names)
 ```
-
-
-```
-
-
