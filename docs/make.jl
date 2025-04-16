@@ -19,6 +19,8 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        #"Aligment Methods" => "alignment.md",  
+        "API Reference" => "api.md",
     ],
     doctest=false,
 )

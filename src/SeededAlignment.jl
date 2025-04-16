@@ -18,10 +18,10 @@ include("seq_alignment/msa_codon_align.jl")
 export 
     # Alignment Methods
     msa_codon_align, seed_chain_align, nw_align,
-    # Alignment Options Helper functions
-    std_codon_moveset, std_codon_scoring, pairwise_noisy_moveset, get_all_moves,
     # Alignment Options constructors
     MoveSet, ScoreScheme, Move, 
     # Remove single indel noise from a Pairwise Codon Alignment
-    clean_alignment_readingframe
+    clean_alignment_readingframe,
+    # Alignment Options Helper functions
+    std_codon_moveset, std_codon_scoring, pairwise_noisy_moveset, get_all_moves
 end

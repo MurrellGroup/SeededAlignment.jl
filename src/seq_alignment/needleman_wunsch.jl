@@ -404,5 +404,5 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
         # used in testing
         return reverse(res_A), reverse(res_B), dp_matrix[end,end]
     end
-    return reverse(res_A), reverse(res_B) #, -1.0
+    return reverse(res_A), reverse(res_B), -1.0
 end
