@@ -1,5 +1,8 @@
 # SeededAlignment.jl
 
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://MurrellGroup.github.io/SeededAlignment.jl/dev/)
+[![Build Status](https://github.com/MurrellGroup/SeededAlignment.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/MurrellGroup/SeededAlignment.jl/actions/workflows/CI.yml?query=branch%3Amain)
+
 A Julia package for efficent, flexible, reading frame respecting alignments. 
 
 ## 📦 Installation
