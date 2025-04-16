@@ -1,25 +1,3 @@
-struct Move
-    step::Int
-    score::Float64
-
-    # refers to readingFrame of top sequence
-    horizontal_stride::Int
-    horizontal_phase::Int
-
-    # refers to readingFrame of bottom sequence
-    vertical_stride::Int
-    vertical_phase::Int
-
-    # allows moves to be extended from 
-    extensionAble::Bool
-end
-
-# moves that assume both sequences have the same reading frame # TODO check this thinking is correct
-Move(step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::Bool=false) =
-    Move(step, score, stride, phase, stride, phase, extensionAble)
-
-Move(step::Int64, score::Float64, extensionAble::Bool=false) = Move(step, score, 1, 0, extensionAble)
-
 # Convert NucleicAcid to integer A -> 1, C -> 2, G -> 3, T -> 4
 toInt(x::NucleicAcid) = trailing_zeros(reinterpret(UInt8, x)) + 1
 
@@ -29,8 +7,21 @@ function simple_match_penalty_matrix(match_score, mismatch_score, n=4)
     return m
 end
 
+""" 
+    nw_align(A::LongDNA{4},B::LongDNA{4},moveset::MoveSet,scoreScheme::ScoreScheme)
+    Takes two ungapped LongDNA{4} sequences and computes an optimal pairwise alignment 
+    with respect to the moveset and the scoreScheme. 
+
+"""
+function nw_align(A::LongDNA{4}, B::LongDNA{4}, moveset::MoveSet, scoreScheme::ScoreScheme)
+    match_moves, hgap_moves, vgap_moves = get_all_moves(moveset)
+    match_score, mismatch_score, extension_score, edge_ext_begin, edge_ext_end, kmerlength = get_all_params(scoreScheme)
+    #FIXME add edge_boolean_options
+    nw_align(A, B, match_score, mismatch_score, match_moves, vgap_moves, hgap_moves, extension_score, edge_ext_begin, edge_ext_end)
+end
+
 function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score::Float64, mismatch_score::Float64, 
-                match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, testMode=false::Bool) 
+                match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, testMode=false::Bool)
 
     nw_align(A, B, simple_match_penalty_matrix(match_score, mismatch_score), match_moves, vgap_moves, hgap_moves, testMode) 
 end
@@ -170,7 +161,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
         # used in testing
         return reverse(res_A), reverse(res_B), dp_matrix[end,end]
     end
-    return reverse(res_A), reverse(res_B)
+    return reverse(res_A), reverse(res_B), -1.0
 end
 
 # Needleman Wunsch alignment with affine scoring
@@ -181,11 +172,12 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score::Float64, mismatch_s
     nw_align(A, B, simple_match_penalty_matrix(match_score, mismatch_score), match_moves, vgap_moves, hgap_moves, extension_score, edge_extension_begin, edge_extension_end,testMode) 
 end
 
-function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float64, 2}, match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score::Float64, edge_extension_begin=false::Bool, edge_extension_end=false::Bool,testMode=false::Bool)
+function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float64, 2}, match_moves::Vector{Move}, vgap_moves::Vector{Move},
+    hgap_moves::Vector{Move}, extension_score::Float64, edge_extension_begin=false::Bool, edge_extension_end=false::Bool, testMode=false::Bool)
     
     n, m = length(A), length(B)
 
-    if (extension_score < 0)
+    if !(extension_score > 0)
         # Do non-affine NW
         return nw_align(A, B, match_score_matrix, match_moves, vgap_moves, hgap_moves)
     end
@@ -409,7 +401,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
 
     if testMode
         # used in testing
-        return reverse(res_A), reverse(res_B), dp_matrix[end:end]
+        return reverse(res_A), reverse(res_B), dp_matrix[end,end]
     end
-    return reverse(res_A), reverse(res_B)
+    return reverse(res_A), reverse(res_B) #, -1.0
 end

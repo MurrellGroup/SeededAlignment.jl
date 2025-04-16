@@ -21,6 +21,39 @@ struct Endpoint
     isBeginning::Bool
 end
 
+"""
+    seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::MoveSet, scoreScheme::ScoreScheme)
+Perform pairwise alignment between two DNA sequences using a seeding strategy.
+
+# Arguments
+- `A::LongDNA{4}`: The first DNA sequence to align.
+- `B::LongDNA{4}`: The second DNA sequence to align.
+- `moveset::MoveSet`: Defines allowed alignment moves (e.g., match, mismatch, gap).
+- `scoreScheme::ScoreScheme`: Scoring scheme for e.g. matches, mismatches, and gaps.
+
+# Returns
+- `Vector{LongDNA{4}}`: A vector the two aligned sequences.
+
+# Description
+This function performs a fast (sub-quadratic) pairwise alignment using seeding and chaining. It identifies high-scoring seed matches between `A` and `B`, chains them to build a candidate alignment skeleton, and fills gaps between seeds using dynamic programming guided by `moveset` and `scoreScheme`.
+
+
+# Example
+```julia
+A = LongDNA{4}("ACGTACGT")
+B = LongDNA{4}("ACGTTGCA")
+moveset = std_codon_moveset()
+scoreScheme = std_codon_scoring()
+
+alignment = seed_chain_align(A, B, moveset, scoreScheme)
+```
+"""
+function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::MoveSet, scoreScheme::ScoreScheme)
+    match_moves, hgap_moves, vgap_moves = get_all_moves(moveset)
+    match_score, mismatch_score, extending_score, edge_ext_begin, edge_ext_end, kmerlength = get_all_params(scoreScheme)
+    seed_chain_align(A, B, match_score, mismatch_score, match_moves, vgap_moves, hgap_moves, extending_score, kmerlength)
+end
+
 function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score::Float64, mismatch_score::Float64, 
         match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score::Float64, kmerLength::Int64 = 12) 
     return seed_chain_align(A, B, simple_match_penalty_matrix(match_score, mismatch_score), match_moves::Vector{Move}, 
@@ -271,13 +304,14 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Arra
     for kmer in kmerPath
         if !(kmer.posA == prevA + k && kmer.posB == prevB + k)
             if prevA == -k+1 && prevB == -k+1
-                alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_score_matrix, match_moves, vgap_moves, hgap_moves, extension_score, true, false)
+                alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_score_matrix, match_moves, vgap_moves, hgap_moves, extension_score, true, false)[1:2]
+                println(alignment)
                 result .*= alignment
             else
                 # NOTE that this only works on vertical_phase if the global vertical_phase is 0
                 local_vgap = updateMovePhase(vgap_moves, prevA+k, prevB+k)
                 local_hgap = updateMovePhase(hgap_moves, prevA+k, prevB+k)
-                alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_score_matrix, match_moves, local_vgap, local_hgap, extension_score, false, false)
+                alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_score_matrix, match_moves, local_vgap, local_hgap, extension_score, false, false)[1:2]
                 result .*= alignment
             end
         end
@@ -288,7 +322,9 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Arra
     # NOTE that this only works on vertical_phase if the global vertical_phase is 0
     local_vgap = updateMovePhase(vgap_moves, prevA+k, prevB+k)
     local_hgap = updateMovePhase(hgap_moves, prevA+k, prevB+k)
-    result .*= nw_align(A[prevA + k : m], B[prevB + k : n], match_score_matrix, match_moves, local_vgap, local_hgap, extension_score, false, true)
+    println(A[prevA + k : m])
+    println(B[prevB + k : n])
+    result .*= nw_align(A[prevA + k : m], B[prevB + k : n], match_score_matrix, match_moves, local_vgap, local_hgap, extension_score, false, true)[1:2]
 
     return result
 end
