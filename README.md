@@ -8,7 +8,7 @@ You can install this package using Julia's package manager:
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/yourusername/ProjectName.jl")
+Pkg.add(url="https://github.com/MurrellGroup/SeededAlignment.jl")
 ```
 
 ## Core Features 🔧
