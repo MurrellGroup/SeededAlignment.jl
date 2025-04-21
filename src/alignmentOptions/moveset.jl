@@ -46,7 +46,7 @@ Move(; step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::
     Move(step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::Bool)
 
 Move(step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::Bool=false) =
-    Move(step, score, stride, phase, 1, 0, extensionAble)
+    Move(step, score, 1, 0, stride, phase, extensionAble)
 
 Move(step::Int64, score::Float64, extensionAble::Bool=false) = Move(step, score, 1, 0, extensionAble)
 
