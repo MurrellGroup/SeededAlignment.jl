@@ -51,6 +51,18 @@ score_params = ScoreScheme(extension_score = 0.3, mismatch_score = 0.7) # (every
 function ScoreScheme(; match_score=0.0, mismatch_score=0.5,extension_score=0.1,edge_ext_begin=true,edge_ext_end=true,kmerlength=21)
 	return ScoreScheme(match_score,mismatch_score,extension_score,edge_ext_begin,edge_ext_end,kmerlength)
 end
+
+import Base: show
+function show(io::IO, s::ScoreScheme)
+	print(io, "ScoreScheme(",
+			  "match=$(s.match_score), ",
+			  "mismatch=$(s.mismatch_score), ",
+			  "extension=$(s.extension_score), ",
+			  "begin_ext=$(s.edge_ext_begin), ",
+			  "end_ext=$(s.edge_ext_end), ",
+			  "kmer=$(s.kmerlength))")
+end
+
 """
     std_codon_scoring()
 

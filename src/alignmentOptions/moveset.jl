@@ -1,4 +1,4 @@
-
+import Base: show
 """
     Move
 
@@ -47,6 +47,18 @@ Move(step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::Bo
     Move(step, score, stride, phase, 1, 0, extensionAble)
 
 Move(step::Int64, score::Float64, extensionAble::Bool=false) = Move(step, score, 1, 0, extensionAble)
+
+function show(io::IO, m::Move)
+	print(io, "Move(",
+			  "step=$(m.step), ",
+			  "score=$(m.score), ",
+			  "v_stride=$(m.vertical_stride), ",
+			  "v_phase=$(m.vertical_phase), ",
+              "h_stride=$(m.horizontal_stride), ",
+			  "h_phase=$(m.horizontal_phase), ",
+			  "extensionAble=$(m.extensionAble))")
+end
+
 """
     MoveSet
 
@@ -66,6 +78,13 @@ struct MoveSet # TODO swap to tuples
 	match_moves::Vector{Move}
 	hor_moves::Vector{Move}
 	vert_moves::Vector{Move}
+end
+
+function show(io::IO, ms::MoveSet)
+	print(io, "MoveSet(\n",
+			  "  match_moves=$(ms.match_moves) \n",
+			  "  hor_moves=$(ms.hor_moves) \n",
+			  "  vert_moves=$(ms.vert_moves)\n)")
 end
 
 """
