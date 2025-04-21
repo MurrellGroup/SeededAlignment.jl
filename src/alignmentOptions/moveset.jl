@@ -42,7 +42,9 @@ struct Move # TODO remove vertical_stride and phase for consistency
     extensionAble::Bool
 end
 
-# moves that assume both sequences have the same reading frame
+Move(; step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::Bool=false) = 
+    Move(step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::Bool)
+
 Move(step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::Bool=false) =
     Move(step, score, stride, phase, 1, 0, extensionAble)
 
@@ -80,6 +82,8 @@ struct MoveSet # TODO swap to tuples
 	vert_moves::Vector{Move}
 end
 
+MoveSet(; match_moves, hor_moves, vert_moves) = MoveSet(match_moves, hor_moves, vert_moves)
+
 function show(io::IO, ms::MoveSet)
 	print(io, "MoveSet(\n",
 			  "  match_moves=$(ms.match_moves) \n",
@@ -106,7 +110,6 @@ Return a standard codon-aware `MoveSet` for sequence alignment.
 
 Use this as a default `MoveSet` for codon-preserving alignments.
 """
-
 function std_codon_moveset()
 	match_moves = [Move(1,.0)]
 	hor_moves =  [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true)]

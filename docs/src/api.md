@@ -10,33 +10,33 @@ This section provides detailed documentation for all public types and functions 
 
 These types define the fundamental structures used in the alignment algorithms:
 
-- `Move`
-- `MoveSet`
-- `ScoreScheme`
+- [`Move`](@ref)
+- [`MoveSet`](@ref)
+- [`ScoreScheme`](@ref)
 - `LongDNA{4}`
 
 ## Alignment Functions
 
 These functions perform the actual sequence alignment operations:
 
-- `seed_chain_align`
-- `nw_align`
-- `msa_codon_align`
-- `clean_alignment_readingframe`
+- [`seed_chain_align`](@ref)
+- [`msa_codon_align`](@ref)
+- [`clean_alignment_readingframe`](@ref)
+- [`nw_align`](@ref)
 
 ## Utilities
 
 Helper functions for working with alignment data:
 
-- `read_fasta`
-- `write_fasta`
+- [`read_fasta`](@ref)
+- [`write_fasta`](@ref)
 
 ## Standard Parameters
 
 Pre-configured settings for common alignment scenarios:
 
-- `std_codon_scoring`
-- `std_codon_moveset`
+- [`std_codon_scoring`](@ref)
+- [`std_codon_moveset`](@ref)
 - `pairwise_noisy_moveset`
 
 ## Function Index
@@ -48,4 +48,5 @@ A complete alphabetical listing of all documented functions.
 
 ```@autodocs
 Modules = [SeededAlignment]
+Order = [:type, :function]
 ```

@@ -9,20 +9,22 @@ DocMeta.setdocmeta!(
 )
 
 makedocs(;
-    modules=[SeededAlignment],
-    authors="Willó Corry and contributors",
-    sitename="SeededAlignment.jl",
-    format=Documenter.HTML(;
-        canonical="https://MurrellGroup.github.io/SeededAlignment.jl",
-        edit_link="main",
-        assets=String[],
+    modules = [SeededAlignment],
+    authors = "Willó Corry and contributors",
+    sitename = "SeededAlignment.jl",
+    format = Documenter.HTML(;
+        canonical = "https://MurrellGroup.github.io/SeededAlignment.jl",
+        edit_link = "main",
+        assets = String[],
     ),
-    pages=[
+    pages = [
         "Home" => "index.md",
-        #"Aligment Methods" => "alignment.md",  
+        #"Tutorial" => "tutorial.md"
+        #"Customizing Alignments" => "customizing alignments.md",
+        "Types" => "types.md",
         "API Reference" => "api.md",
     ],
-    doctest=false,
+    doctest = false,
 )
 
 deploydocs(;
