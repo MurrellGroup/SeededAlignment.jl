@@ -29,7 +29,7 @@ alignment = msa_codon_align(ref, seqs, moveset, score_params)
 ```
 NOTE: The sequences (ungapped) might not be preserved by the alignment by the cleanup step. Some nucleotides might be inserted or removed.  
 """
-function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::MoveSet, score_params::ScoreScheme)
+function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::MoveSet, score_params::ScoreScheme, debug=false)
     cleaned_codon_alignment = Vector{LongDNA{4}}(undef, length(seqs)+1)
     # perform pairwise SeededAlignment for each sequence
     aligned_refs, aligned_seqs = align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::MoveSet, score_params::ScoreScheme)
@@ -38,8 +38,68 @@ function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::Mov
     for i in 1:length(seqs)
         cleaned_codon_alignment[i+1] = clean_alignment_readingframe(aligned_refs[i],aligned_seqs[i])
     end
+    # handle readingFrame respecting triplet insertion relative to the readingFrame. 
+    if !debug
+        insertion_dict = Dict{Int64, Set{Int64}}()
+        for seqId in 1:length(seqs)
+            println("cur seqId: ", seqId)
+            triplet_insertions = find_triplet_insertions(aligned_refs[seqId])
+            println("tripplet insertion: ",triplet_insertions)
+            if length(triplet_insertions) != 0
+                for x in triplet_insertions
+                    push!(get!(insertion_dict,x, Set{Int64}()), seqId+1) # +1 ignore reference refactor would be good
+                end
+            end
+        end
+        println("insertion_dict ", insertion_dict)
+        insert_positions = sort!(collect(keys(insertion_dict)))
+        println("keys", insert_positions)
+        insert_addons_vec = zeros(Int64, length(seqs)+1)
+        #inserted_against = fill(0, row_boundary,column_boundary)
+        insertAddon = 0
+        for insert_pos in insert_positions
+            seqsIds_with_insertions = insertion_dict[insert_pos]
+            println(" with_insertion", seqsIds_with_insertions)
+            # insert triplet if not in the above set
+            for seqId in 1:length(seqs)+1
+                if !(seqId in seqsIds_with_insertions)
+                    println("insertion gaps added", " seqId: ", seqId)
+                    #insertAddon = insert_addons_vec[seqId]
+                    println("insertAddon: ", insertAddon)
+                    cleaned_codon_alignment[seqId] = cleaned_codon_alignment[seqId][1:insert_pos+insertAddon] * LongDNA{4}("---") * cleaned_codon_alignment[seqId][insert_pos+insertAddon+1:end]
+                    
+                    #insert_addons_vec[seqId] += 3 # could work
+                end
+            end
+            insertAddon += 3
+        end
+    end
+   
     return cleaned_codon_alignment
 end
+
+function find_triplet_insertions(aligned_ref::LongDNA{4})
+    indicies = Vector{Int64}()
+    num_single_insertion = 0
+    for i in 1:length(aligned_ref)-2
+        if i == 1
+            println("early")
+        elseif i >= length(aligned_ref)-2
+            println("late")
+        else
+            if aligned_ref[i] == DNA_Gap && !(aligned_ref[i+1] == DNA_Gap || aligned_ref[i-1] == DNA_Gap)
+                num_single_insertion += 1
+            elseif aligned_ref[i] == DNA_Gap && aligned_ref[i+1] == DNA_Gap && aligned_ref[i+2] == DNA_Gap
+                println("triplet identified!")
+                println(aligned_ref[i:i+5], " ", i)
+                push!(indicies, i-num_single_insertion-1)
+            end
+        end
+    end
+    return indicies 
+end
+
+
 
 
 """
@@ -54,11 +114,14 @@ function align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moves
     aligned_refs = Vector{LongDNA{4}}(undef,length(seqs))
     # perform seeded alignment for each sequence w.r.t. reference sequence
     for seqId in 1:length(seqs)
-        aligned_ref, aligned_seq = seed_chain_align(ref,ungap(seqs[seqId]),moveset,score_params)
+        # TODO empty chains bug fix
+        #aligned_ref, aligned_seq = seed_chain_align(ref,ungap(seqs[seqId]),moveset,score_params) 
+        aligned_ref, aligned_seq = nw_align(ref,ungap(seqs[seqId]),moveset,score_params)
         # save entire alignment to clean up later
-        aligned_seqs[seqId] = aligned_seq
-        aligned_refs[seqId] = aligned_ref
+        aligned_seqs[seqId] = copy(aligned_seq)
+        aligned_refs[seqId] = copy(aligned_ref)
     end
+    write_fasta("fasta_output/test_mutated_refs_only2.fasta", aligned_refs)
     return aligned_refs, aligned_seqs
 end
 
@@ -126,6 +189,7 @@ function clean_alignment_readingframe(aligned_ref::LongDNA{4},aligned_seq::LongD
             end
         # insertion
         else
+            println("insertion removal")
             x = x-insertAddon
             if x == 1
                 aligned_seq = aligned_seq[x+1:end]
@@ -134,12 +198,12 @@ function clean_alignment_readingframe(aligned_ref::LongDNA{4},aligned_seq::LongD
                 aligned_seq = aligned_seq[1:x-1]
                 insertAddon += 1
             else
+                println("insertion removal middle removed: ", aligned_seq[x], " at ", x)
                 aligned_seq = aligned_seq[1:x-1] * aligned_seq[x+1:end]
                 insertAddon += 1
             end
         end
     end
-
     return aligned_seq
 end
 
