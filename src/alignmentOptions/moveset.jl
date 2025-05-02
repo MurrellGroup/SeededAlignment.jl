@@ -42,11 +42,18 @@ struct Move # TODO remove vertical_stride and phase for consistency
     extensionAble::Bool
 end
 
-Move(; step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::Bool=false) = 
-    Move(step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::Bool)
+#TODO fix the useful constructor.
 
 Move(step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::Bool=false) =
-    Move(step, score, 1, 0, stride, phase, extensionAble)
+    Move(step, score, 1,0, stride, phase, extensionAble)
+
+#function Move(step::Int64, score::Float64, h_stride::Int64, h_phase::Int64, v_stride::Int64, v_phase::Int64, extensionAble::Bool=false)
+#   return Move(step, score, h_stride, h_phase, v_stride, v_phase, extensionAble)
+#end
+
+function Move(; step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::Bool=false)
+    return Move(step, score, stride, phase, extensionAble)
+end
 
 Move(step::Int64, score::Float64, extensionAble::Bool=false) = Move(step, score, 1, 0, extensionAble)
 
@@ -54,10 +61,10 @@ function show(io::IO, m::Move)
 	print(io, "Move(",
 			  "step=$(m.step), ",
 			  "score=$(m.score), ",
-			  "v_stride=$(m.vertical_stride), ",
-			  "v_phase=$(m.vertical_phase), ",
               "h_stride=$(m.horizontal_stride), ",
 			  "h_phase=$(m.horizontal_phase), ",
+			  "v_stride=$(m.vertical_stride), ",
+			  "v_phase=$(m.vertical_phase), ",
 			  "extensionAble=$(m.extensionAble))")
 end
 

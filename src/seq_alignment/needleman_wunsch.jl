@@ -203,15 +203,11 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
     # Affine moves requires two extra DP matrices
     vaffine_matrix = fill(Inf64, row_boundary, column_boundary)
     haffine_matrix = fill(Inf64, row_boundary, column_boundary)
-
-    # end/start extension biase (optional)
-    start_extension_biase = 0.0 + extension_score
-    end_extension_biase = 0.0 + extension_score
     
     # allow starting in extending
     if edge_extension_begin
-        vaffine_matrix[row_offset,column_offset] = start_extension_biase
-        haffine_matrix[row_offset,column_offset] = start_extension_biase
+        vaffine_matrix[row_offset,column_offset] = 0.0
+        haffine_matrix[row_offset,column_offset] = 0.0
     end
 
     #Main DP -step
@@ -222,10 +218,11 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
 
             # find the best diagonal move
             for k ∈ match_moves
-                #println("column_index ",column_index," row_index ", row_index)
                 mismatch_sum = sum(t -> match_score_matrix[toInt(A2[column_index - t]), toInt(B2[row_index - t])], 1 : k.step)
                 dp_matrix[row_index, column_index] = min(
-                    dp_matrix[row_index, column_index],dp_matrix[row_index-k.step,column_index-k.step]+k.score+mismatch_sum)
+                    dp_matrix[row_index, column_index], 
+                    dp_matrix[row_index-k.step,column_index-k.step]+k.score+mismatch_sum
+                )
             end
 
             # finds the best vertical move
@@ -233,6 +230,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
                 if (top_sequence_pos) % k.vertical_stride == k.vertical_phase &&
                     (left_sequence_pos-k.step) % k.horizontal_stride == k.horizontal_phase
                     if k.extensionAble # TODO rename
+                        # do here
                         vaffine_matrix[row_index, column_index] = min(
                             vaffine_matrix[row_index, column_index],
                             vaffine_matrix[row_index - k.step, column_index] + extension_score * k.step,
@@ -265,23 +263,36 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
                     end
                 end
             end
-
             # find overall best move
             dp_matrix[row_index, column_index] = min(
                 dp_matrix[row_index, column_index], 
                 haffine_matrix[row_index, column_index],
                 vaffine_matrix[row_index, column_index]
             )
-            # allows us to end in extension state (add constant to expression to adjust sensitivity of extension)
-            # TODO make sure this is done in Backtracking
-            if column_index == column_boundary && edge_extension_end
-                vaffine_matrix[row_index,column_index] = dp_matrix[row_index,column_index] + end_extension_biase
-            elseif row_index == row_boundary && edge_extension_end
-                haffine_matrix[row_index,column_index] = dp_matrix[row_index,column_index] + end_extension_biase
-            end
         end
     end
 
+    # TODO make sure this is done in Backtracking
+    if edge_extension_end
+        for row_index in row_offset : row_boundary
+            vaffine_matrix[row_boundary,column_boundary] = min(
+                vaffine_matrix[row_boundary,column_boundary],  
+                dp_matrix[row_index,column_boundary] + extension_score*(row_boundary-row_index)
+            )
+        end
+        for column_index in column_offset : column_boundary
+            haffine_matrix[row_boundary,column_boundary] = min(
+                haffine_matrix[row_boundary, column_boundary],
+                dp_matrix[row_boundary,column_index] + extension_score*(column_boundary-column_index)
+            )
+        end
+        # update end score
+        dp_matrix[row_boundary, column_boundary] = min(
+                dp_matrix[row_boundary, column_boundary], 
+                haffine_matrix[row_boundary, column_boundary],
+                vaffine_matrix[row_boundary, column_boundary]
+            )
+    end
     # Backtracking
     res_A = LongDNA{4}("")
     res_B = LongDNA{4}("")
@@ -303,6 +314,38 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
             push!(res_B, DNA_Gap)
             x -= 1
         else
+            # end extension backtrack
+            if x == column_boundary && edge_extension_end
+                println("in")
+                for i in 1:y-row_offset
+                    if dp_matrix[y,x] == dp_matrix[y-i,x]+i*extension_score
+                        for j ∈ 1 : i
+                            print("in 3")
+                            push!(res_A, DNA_Gap)
+                            push!(res_B, B2[y - j])
+                        end
+                        y -= i
+                        # do stuff
+                        break
+                    end
+                end
+            end
+            if y == row_boundary && edge_extension_end
+                for i in 1:x-column_offset
+                    if dp_matrix[y,x] == dp_matrix[y,x-i]+i*extension_score
+                        for j ∈ 1:i
+                            println("in 2")
+                            push!(res_A, A2[x - i])
+                            push!(res_B, DNA_Gap)
+                        end
+                        x -= i
+                        # do stuff
+                        break
+                    end
+                end
+            end
+
+
             # record previous position
             px = x
             py = y
@@ -377,7 +420,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
 
                 # iterate through digonal match moves
                 for k ∈ match_moves
-                    #calculate total (mis-)match score 
+                    #calculate total (mis-)match score
                     s = sum(t -> match_score_matrix[toInt(A2[x-t]), toInt(B2[y-t])], 1 : k.step)
                     # check if the move leads to the current cell
                     if dp_matrix[y, x] == dp_matrix[y - k.step,x - k.step] + k.score + s

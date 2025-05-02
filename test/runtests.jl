@@ -83,6 +83,24 @@ include("sequence_generator.jl")
             @test length(alignment_aff[1]) == length(alignment_aff[2])
         end
 
+        @testset "start and ending extension" begin
+            score_params = ScoreScheme(match_score=0.0, mismatch_score=0.3, extension_score=0.4, edge_ext_begin=true,edge_ext_end=true, kmerlength=30)
+            A = LongDNA{4}("TTTAAAGGG")
+            B = LongDNA{4}("AAAGGGCCC")
+            move_set = MoveSet(match_moves = [Move(1, 0.0, 1, 0, 1, 0, false)],
+                            hor_moves = [Move(3, 30, 1, 0, 1, 0, true)],
+                            vert_moves = [Move(3, 30, 1, 0, 1, 0, true)]
+                        )
+            alignment = nw_align(A,B,move_set,score_params)
+            # test is matches expected output
+            @test alignment[1] == LongDNA{4}("TTTAAAGGG---")
+            @test alignment[2] == LongDNA{4}("---AAAGGGCCC")
+            score_params = ScoreScheme(match_score=0.0, mismatch_score=0.3, extension_score=0.4, edge_ext_begin=false,edge_ext_end=false, kmerlength=30)
+            alignment = nw_align(A,B,move_set,score_params)
+            @test alignment[1] == LongDNA{4}("TTTAAAGGG")
+            @test alignment[2] == LongDNA{4}("AAAGGGCCC")
+        end
+
         #@testset "alignment is symmetric in A and B if vertical and horizontal moves are the same" begin
         #    alignment_symmetric = nw_align(B, A, .0, 0.5, match_moves, gap_moves, gap_moves,0.3,true,true,true)
             #println(alignment_aff[1])

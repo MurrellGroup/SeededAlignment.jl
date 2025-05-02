@@ -104,13 +104,17 @@ function updateMovePhase(moves::Vector{Move}, posA::Int64, posB::Int64)
     #NOTE we also assume that the global vertical_phase is 0 for all updates of vertical_phase
     local_moves = Vector{Move}()
     for k in moves
-        A_codon_pos = (posA-1) % k.vertical_stride
-        ## ASSUME vertical_phase 0
-        new_v_phase = (k.vertical_stride-A_codon_pos) % k.vertical_stride
-        new_h_phase = k.horizontal_phase
-        # create local move with correct phase
-        tmp_move = Move(k.step, k.score, k.horizontal_stride, new_h_phase, k.vertical_stride, new_v_phase, k.extensionAble)
-        push!(local_moves,tmp_move)
+        if k.vertical_stride != 1
+            A_codon_pos = (posA-1) % k.vertical_stride
+            ## ASSUME vertical_phase 0
+            new_v_phase = (k.vertical_stride-A_codon_pos) % k.vertical_stride
+            new_h_phase = k.horizontal_phase # no change
+            # create local move with correct phase
+            tmp_move = Move(step = k.step, score = k.score, stride = k.vertical_stride, phase=new_v_phase, extensionAble = k.extensionAble)
+            push!(local_moves,tmp_move)
+        else
+            push!(local_moves, k)
+        end
     end
     return local_moves
 end
@@ -321,8 +325,6 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Arra
     # NOTE that this only works on vertical_phase if the global vertical_phase is 0
     local_vgap = updateMovePhase(vgap_moves, prevA+k, prevB+k)
     local_hgap = updateMovePhase(hgap_moves, prevA+k, prevB+k)
-    println(A[prevA + k : m])
-    println(B[prevB + k : n])
     result .*= nw_align(A[prevA + k : m], B[prevB + k : n], match_score_matrix, match_moves, local_vgap, local_hgap, extension_score, false, true)[1:2]
 
     return result
