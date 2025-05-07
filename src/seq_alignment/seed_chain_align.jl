@@ -2,7 +2,7 @@ function CorrelationScore(s::SampleMetrics)
     return sqrt(s.n) * s.correlation
 end
 
-struct KmerMatch
+mutable struct KmerMatch
     posA::Int64
     posB::Int64
 end
@@ -99,6 +99,7 @@ function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmerLength)
 
     return kmerMatches
 end
+
 function updateMovePhase(moves::Vector{Move}, posA::Int64, posB::Int64)
     #NOTE we don't update horiontal phase
     #NOTE we also assume that the global vertical_phase is 0 for all updates of vertical_phase
@@ -299,13 +300,20 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Arra
     n = length(B)   
     
     kmerMatches = find_kmer_matches(A, B, k)
-    kmerPath = select_kmer_path(kmerMatches, m, n, match_score_matrix, match_moves, vgap_moves, hgap_moves, extension_score, k)
-    
-    #Join kmers using needleman Wunsch
+    kmerPath = select_kmer_path(kmerMatches, m, n, match_score_matrix, match_moves, vgap_moves, hgap_moves, extension_score, k)    
+
+    # parameters for joining kmers
+    extra_kmer_margin = 3
+    # Join kmers using needleman Wunsch
+    k = k-extra_kmer_margin
     prevA = -k+1
     prevB = -k+1
     result = [LongDNA{4}(""), LongDNA{4}("")]
     for kmer in kmerPath
+        # shift start of kmer to start of next codon
+        offset_from_codon_boundary = ((kmer.posA) % 3)
+        kmer.posA += (3-offset_from_codon_boundary)+1
+        kmer.posB += (3-offset_from_codon_boundary)+1
         if !(kmer.posA == prevA + k && kmer.posB == prevB + k)
             if prevA == -k+1 && prevB == -k+1
                 alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_score_matrix, match_moves, vgap_moves, hgap_moves, extension_score, true, false)[1:2]

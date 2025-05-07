@@ -162,7 +162,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
         # used in testing
         return reverse(res_A), reverse(res_B), dp_matrix[end,end]
     end
-    return reverse(res_A), reverse(res_B), -1.0
+    return reverse(res_A), reverse(res_B), dp_matrix
 end
 
 # Needleman Wunsch alignment with affine scoring
@@ -316,11 +316,9 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
         else
             # end extension backtrack
             if x == column_boundary && edge_extension_end
-                println("in")
                 for i in 1:y-row_offset
                     if dp_matrix[y,x] == dp_matrix[y-i,x]+i*extension_score
                         for j ∈ 1 : i
-                            print("in 3")
                             push!(res_A, DNA_Gap)
                             push!(res_B, B2[y - j])
                         end
@@ -334,8 +332,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
                 for i in 1:x-column_offset
                     if dp_matrix[y,x] == dp_matrix[y,x-i]+i*extension_score
                         for j ∈ 1:i
-                            println("in 2")
-                            push!(res_A, A2[x - i])
+                            push!(res_A, A2[x - j])
                             push!(res_B, DNA_Gap)
                         end
                         x -= i
@@ -447,5 +444,5 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
         # used in testing
         return reverse(res_A), reverse(res_B), dp_matrix[end,end]
     end
-    return reverse(res_A), reverse(res_B), -1.0
+    return reverse(res_A), reverse(res_B), dp_matrix
 end
