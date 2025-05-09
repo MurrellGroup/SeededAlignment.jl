@@ -303,7 +303,7 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Arra
     kmerPath = select_kmer_path(kmerMatches, m, n, match_score_matrix, match_moves, vgap_moves, hgap_moves, extension_score, k)    
 
     # parameters for joining kmers
-    extra_kmer_margin = 3
+    extra_kmer_margin = 6
     # Join kmers using needleman Wunsch
     k = k-extra_kmer_margin
     prevA = -k+1
@@ -312,17 +312,25 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Arra
     for kmer in kmerPath
         # shift start of kmer to start of next codon
         offset_from_codon_boundary = ((kmer.posA) % 3)
-        kmer.posA += (3-offset_from_codon_boundary)+1
-        kmer.posB += (3-offset_from_codon_boundary)+1
+        kmer.posA += (3-offset_from_codon_boundary)+4
+        kmer.posB += (3-offset_from_codon_boundary)+4
         if !(kmer.posA == prevA + k && kmer.posB == prevB + k)
             if prevA == -k+1 && prevB == -k+1
                 alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_score_matrix, match_moves, vgap_moves, hgap_moves, extension_score, true, false)[1:2]
+                #@show alignment
                 result .*= alignment
             else
                 # NOTE that this only works on vertical_phase if the global vertical_phase is 0
                 local_vgap = updateMovePhase(vgap_moves, prevA+k, prevB+k)
                 local_hgap = updateMovePhase(hgap_moves, prevA+k, prevB+k)
                 alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_score_matrix, match_moves, local_vgap, local_hgap, extension_score, false, false)[1:2]
+                #println("h")
+                #@show alignment
+                #@show extension_score
+                #@show local_hgap
+                #@show local_vgap
+                #println(prevA + k, " ", kmer.posA - 1)
+                #println(prevB + k, " ", kmer.posB - 1)
                 result .*= alignment
             end
         end

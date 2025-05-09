@@ -182,7 +182,8 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
         # Do non-affine NW
         return nw_align(A, B, match_score_matrix, match_moves, vgap_moves, hgap_moves)
     end
-
+    #@show A
+    #@show B
     # Offset indeces to avoid bounds-checking
     column_offset = maximum(k -> k.step, vcat(match_moves, hgap_moves)) + 1
     row_offset = maximum(k -> k.step, vcat(match_moves, vgap_moves)) + 1
@@ -272,7 +273,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
         end
     end
 
-    # TODO make sure this is done in Backtracking
+    #@show edge_extension_end
     if edge_extension_end
         for row_index in row_offset : row_boundary
             vaffine_matrix[row_boundary,column_boundary] = min(
@@ -303,6 +304,8 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
     must_move_ver = false
     must_move_hor = false
     while x > column_offset || y > row_offset
+        #println("x ", x)
+        #println("y ", y)
         top_sequence_pos = x-column_offset
         left_sequence_pos = y-row_offset
         if x == column_offset # first column
@@ -317,7 +320,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
             # end extension backtrack
             if x == column_boundary && edge_extension_end
                 for i in 1:y-row_offset
-                    if dp_matrix[y,x] == dp_matrix[y-i,x]+i*extension_score
+                    if isapprox(dp_matrix[y,x],dp_matrix[y-i,x]+i*extension_score)
                         for j ∈ 1 : i
                             push!(res_A, DNA_Gap)
                             push!(res_B, B2[y - j])
@@ -330,7 +333,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
             end
             if y == row_boundary && edge_extension_end
                 for i in 1:x-column_offset
-                    if dp_matrix[y,x] == dp_matrix[y,x-i]+i*extension_score
+                    if isapprox(dp_matrix[y,x],dp_matrix[y,x-i]+i*extension_score)
                         for j ∈ 1:i
                             push!(res_A, A2[x - j])
                             push!(res_B, DNA_Gap)
@@ -347,7 +350,37 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
             px = x
             py = y
 
-            if !must_move_hor
+            # iterate through digonal match moves
+            match_Found = false
+            if !must_move_hor && !must_move_ver
+                for k ∈ match_moves
+                    #@show match_moves
+                    #calculate total (mis-)match score
+                    s = sum(t -> match_score_matrix[toInt(A2[x-t]), toInt(B2[y-t])], 1 : k.step)
+                    #@show s
+                    #@show dp_matrix[y, x]
+                    #@show dp_matrix[y - k.step,x - k.step]
+                    #@show isapprox(dp_matrix[y, x],dp_matrix[y - k.step,x - k.step] + k.score + s)
+                    # check if the move leads to the current cell
+                    if isapprox(dp_matrix[y, x],dp_matrix[y - k.step,x - k.step] + k.score + s)
+                        # record the path
+                        for i ∈ 1:k.step
+                            push!(res_A, A2[x - i])
+                            push!(res_B, B2[y - i])
+                        end
+                        x -= k.step
+                        y -= k.step
+                        match_Found = true
+                        break
+                    end
+                end
+            end
+            #println("post match")
+            #println("x ", x)
+            #println("y ", y)
+            #println("match_Found ", match_Found )
+
+            if !must_move_hor && !match_Found
                 
                 for k ∈ vgap_moves
                     !( ((top_sequence_pos) % k.vertical_stride == k.vertical_phase) &&
@@ -355,12 +388,14 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
                     # check if the move leads to the current cell
                     if k.extensionAble
                         current_score = must_move_ver ? vaffine_matrix[y, x] : dp_matrix[y, x]
-                        can_move_affine = (current_score == vaffine_matrix[y-k.step, x] + extension_score * k.step)
-                        can_move_regular = (current_score == dp_matrix[y-k.step, x] + k.score)
+                        can_move_affine = (isapprox(current_score,vaffine_matrix[y-k.step, x] + extension_score * k.step))
+                        can_move_regular = (isapprox(current_score,dp_matrix[y-k.step, x] + k.score))
+                        #@show can_move_affine
+                        #@show can_move_regular
                     else
                         current_score = dp_matrix[y,x]
                         can_move_affine = (false)
-                        can_move_regular = (current_score == dp_matrix[y-k.step,x] + k.score)
+                        can_move_regular = (isapprox(current_score,dp_matrix[y-k.step,x] + k.score))
                     end
                     
                     if can_move_affine || can_move_regular
@@ -370,16 +405,19 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
                         end
                         y -= k.step
 
-                        # constrain next move
-                        if !(y == row_boundary && edge_extension_end)
+                        # constrain next move 
+                        if !(y == row_offset)
                             must_move_ver = !can_move_regular
                         end
                         break
                     end
                 end
             end
+            #println("post vert")
+            #println("x ", x)
+            #println("y ", y)
 
-            if !must_move_ver
+            if !must_move_ver && !match_Found
 
                 # iterate through horizontal Move moves
                 for k ∈ hgap_moves
@@ -388,12 +426,14 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
                     # check if the move leads to the current cell
                     if k.extensionAble
                         current_score = must_move_hor ? haffine_matrix[y, x] : dp_matrix[y, x]
-                        can_move_affine = (current_score == haffine_matrix[y, x-k.step] + extension_score * k.step)
-                        can_move_regular = (current_score == dp_matrix[y,x-k.step] + k.score)
+                        can_move_affine = (isapprox(current_score,haffine_matrix[y, x-k.step] + extension_score * k.step))
+                        can_move_regular = (isapprox(current_score,dp_matrix[y,x-k.step] + k.score))
+                        #@show can_move_affine
+                        #@show can_move_regular
                     else
                         current_score = dp_matrix[y, x]
                         can_move_affine = (false)
-                        can_move_regular = (current_score == dp_matrix[y,x-k.step] + k.score)
+                        can_move_regular = (isapprox(current_score,dp_matrix[y,x-k.step] + k.score))
                     end
 
                     if can_move_affine || can_move_regular
@@ -405,34 +445,17 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
                         x -= k.step
 
                         # constrain next move
-                        if !(x == column_boundary && edge_extension_end)
+                        if !(x == column_offset)
                             must_move_hor = !can_move_regular
                         end
                         break
                     end
                 end
             end
-
-            if !must_move_hor && !must_move_ver
-
-                # iterate through digonal match moves
-                for k ∈ match_moves
-                    #calculate total (mis-)match score
-                    s = sum(t -> match_score_matrix[toInt(A2[x-t]), toInt(B2[y-t])], 1 : k.step)
-                    # check if the move leads to the current cell
-                    if dp_matrix[y, x] == dp_matrix[y - k.step,x - k.step] + k.score + s
-                        # record the path
-                        for i ∈ 1:k.step
-                            push!(res_A, A2[x - i])
-                            push!(res_B, B2[y - i])
-                        end
-                        x -= k.step
-                        y -= k.step
-                        break
-                    end
-                end
-            end
-
+            #println("post hor")
+            #println("x ", x)
+            #println("y ", y)
+            #println("new round")
             # if no move was found
             if px == x && py == y
                 error("Backtracking failed")
@@ -444,5 +467,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
         # used in testing
         return reverse(res_A), reverse(res_B), dp_matrix[end,end]
     end
+    #display(haffine_matrix)
+    #display(vaffine_matrix)
     return reverse(res_A), reverse(res_B), dp_matrix
 end
