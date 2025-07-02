@@ -74,28 +74,38 @@ end
 Defines the full set of allowed alignment moves used during pairwise or multiple sequence alignment.
 
 # Fields
-- `match_moves::Vector{Move}`: Moves that represent matches or substitutions between nucleotides. 
+- `match_moves::Vector{Move}`: Moves that represent matches or substitutions between nucleotides.
+- `vert_moves::Vector{Move}`: Moves that introduce gaps in the **query (vertical)** sequence. 
 - `hor_moves::Vector{Move}`: Moves that introduce gaps in the **reference (horizontal)** sequence.
-- `vert_moves::Vector{Move}`: Moves that introduce gaps in the **query (vertical)** sequence.
 
 # Description
 A `MoveSet` groups the allowable `Move`s into categories used during dynamic programming alignment. Each type controls how the algorithm can transition between states, including nucleotide-level match and gap moves with customizable reading frame behavior.
 
 Used by alignment algorithms such as `seed_chain_align` and  `msa_codon_align` to control the scoring and allowed operations during alignment.
 """
+
 struct MoveSet # TODO swap to tuples
-	match_moves::Vector{Move}
-	hor_moves::Vector{Move}
-	vert_moves::Vector{Move}
+    match_moves::Vector{Move}
+    vert_moves::Vector{Move}
+    hor_moves::Vector{Move}
 end
 
-MoveSet(; match_moves, hor_moves, vert_moves) = MoveSet(match_moves, hor_moves, vert_moves)
+"""
+struct MoveSet{A,B,C} # stack allocated...
+    match_moves::NTuple{A,Move}
+    vert_moves::NTuple{B,Move}
+    hor_moves::NTuple{C,Move}
+end
+"""
+
+
+MoveSet(; match_moves, vert_moves, hor_moves) = MoveSet(match_moves, vert_moves, hor_moves)
 
 function show(io::IO, ms::MoveSet)
 	print(io, "MoveSet(\n",
-			  "  match_moves=$(ms.match_moves) \n",
-			  "  hor_moves=$(ms.hor_moves) \n",
-			  "  vert_moves=$(ms.vert_moves)\n)")
+            "  match_moves=$(ms.match_moves) \n",
+            "  vert_moves=$(ms.vert_moves)\n)",
+            "  hor_moves=$(ms.hor_moves) \n")
 end
 
 """
@@ -118,10 +128,10 @@ Return a standard codon-aware `MoveSet` for sequence alignment.
 Use this as a default `MoveSet` for codon-preserving alignments.
 """
 function std_codon_moveset()
-	match_moves = [Move(1,.0)]
-	hor_moves =  [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true)]
-	vert_moves = [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true)]
-	return MoveSet(match_moves,hor_moves,vert_moves)
+    match_moves = [Move(1,.0)]
+    vert_moves = [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true)]
+    hor_moves =  [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true)]
+    return MoveSet(match_moves,vert_moves,hor_moves)
 end
 """
     pairwise_noisy_moveset()
@@ -129,19 +139,7 @@ end
 """
 function pairwise_noisy_moveset()
     match_moves = [Move(1,.0)]
+    vert_moves = [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,1,0, true)]
     hor_moves =  [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,1,0, true)]
-	vert_moves = [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,1,0, true)]
-    return MoveSet(match_moves,hor_moves,vert_moves)
-end
-
-"""
-    get_all_moves(moveset)
-
-Collects the moves from the moveset. 
-# Returns
-    moveset.match_moves, moveset.hor_moves, moveset.vert_moves
-"""
-
-function get_all_moves(moveset::MoveSet)
-	return moveset.match_moves, moveset.hor_moves, moveset.vert_moves
+    return MoveSet(match_moves,vert_moves,hor_moves)
 end

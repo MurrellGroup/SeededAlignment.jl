@@ -108,6 +108,9 @@ function clean_alignment_readingframe(aligned_ref_vec::Vector{LongDNA{4}}, align
     cleaned_refs = Vector{LongDNA{4}}(undef, length(aligned_ref_vec))
     cleaned_seqs = Vector{LongDNA{4}}(undef, length(aligned_seq_vec))
     for i in 1:n
+        if verbose_flag
+            println("Cleaning the $i:th sequence: subsequent edits may follow:")
+        end
         cleaned_refs[i], cleaned_seqs[i] = clean_alignment_readingframe(aligned_ref_vec[i],aligned_seq_vec[i],verbose_flag)
     end
     return cleaned_refs, cleaned_seqs

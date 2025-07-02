@@ -29,15 +29,19 @@ struct ScoreScheme
     match_score::Float64
 	mismatch_score::Float64
 	extension_score::Float64
-	# bools
+	# start and end extension bools
 	edge_ext_begin::Bool
 	edge_ext_end::Bool
+	# (opt arg) if codon_matching_enabled in aligner function
+	codon_match_bonus::Float64
 	# (opt arg) if seeding
 	kmerlength::Int64
 end
 
-function ScoreScheme(; match_score=0.0, mismatch_score=0.5,extension_score=0.1,edge_ext_begin=true,edge_ext_end=true,kmerlength=21)
-	return ScoreScheme(match_score,mismatch_score,extension_score,edge_ext_begin,edge_ext_end,kmerlength)
+function ScoreScheme(; match_score=0.0, mismatch_score=0.7,extension_score=0.4,
+		codon_match_bonus=-1.0, edge_ext_begin=true,edge_ext_end=true,kmerlength=18)
+	return ScoreScheme(match_score,mismatch_score,extension_score,edge_ext_begin,
+		edge_ext_end,codon_match_bonus,kmerlength)
 end
 
 import Base: show
@@ -48,6 +52,7 @@ function show(io::IO, s::ScoreScheme)
 			  "extension=$(s.extension_score), ",
 			  "begin_ext=$(s.edge_ext_begin), ",
 			  "end_ext=$(s.edge_ext_end), ",
+			  "codon_match_bonus=$(s.codon_match_bonus), ",
 			  "kmer=$(s.kmerlength))")
 end
 
@@ -70,18 +75,15 @@ Use this as a default `ScoreScheme` for codon-preserving alignments.
 """
 function std_codon_scoring()
 	match_score = 0.0
-	mismatch_score = 0.3 
-	extension_score = 0.1
-
+	mismatch_score = 0.7
+	extension_score = 0.4
+	# start and end extension bools
 	edge_ext_begin = true
 	edge_ext_end = true
+	# (opt arg) if codon_matching_enabled in aligner function
+	codon_match_bonus = -1.0
+	# (opt arg) if seeding
+	kmerlength = 18
 
-	kmerlength = 21
-
-	return ScoreScheme(match_score,mismatch_score,extension_score,edge_ext_begin,edge_ext_end,kmerlength)
-end
-
-function get_all_params(score_params::ScoreScheme)
-	return score_params.match_score, score_params.mismatch_score, 
-		score_params.extension_score, score_params.edge_ext_begin, score_params.edge_ext_end, score_params.kmerlength
+	return ScoreScheme(match_score,mismatch_score,extension_score,edge_ext_begin,edge_ext_end,codon_match_bonus,kmerlength)
 end

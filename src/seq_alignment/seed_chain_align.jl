@@ -48,16 +48,19 @@ scoreScheme = std_codon_scoring()
 alignment = seed_chain_align(A, B, moveset, scoreScheme)
 ```
 """
-function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::MoveSet, scoreScheme::ScoreScheme)
-    match_moves, hgap_moves, vgap_moves = get_all_moves(moveset)
-    match_score, mismatch_score, extending_score, edge_ext_begin, edge_ext_end, kmerlength = get_all_params(scoreScheme)
-    seed_chain_align(A, B, match_score, mismatch_score, match_moves, vgap_moves, hgap_moves, extending_score, kmerlength)
+function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, m::MoveSet, s::ScoreScheme; clean_up_flag=false::Bool, codon_matching_enabled=false::Bool)
+    
+    seed_chain_align(A, B, s.match_score, s.mismatch_score, m.match_moves, m.vert_moves, m.hor_moves, 
+        s.extension_score, s.kmerlength, clean_up_flag, codon_matching_enabled, s.codon_match_bonus)
+
 end
 
 function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score::Float64, mismatch_score::Float64, 
-        match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score::Float64, kmerLength::Int64 = 12) 
+        match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score::Float64, kmerLength::Int64 = 12,
+        clean_up_flag=false::Bool, codon_matching_enabled=false::Bool, codon_match_bonus::Float64 = -1.0)
+
     return seed_chain_align(A, B, simple_match_penalty_matrix(match_score, mismatch_score), match_moves::Vector{Move}, 
-           vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score, kmerLength)
+           vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score, kmerLength, clean_up_flag, codon_matching_enabled, codon_match_bonus)
 end
 
 function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmerLength)
@@ -100,6 +103,7 @@ function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmerLength)
     return kmerMatches
 end
 
+# TODO depricated
 function updateMovePhase(moves::Vector{Move}, posA::Int64, posB::Int64)
     #NOTE we don't update horiontal phase
     #NOTE we also assume that the global vertical_phase is 0 for all updates of vertical_phase
@@ -133,7 +137,7 @@ function select_max_correlation_kmer_path(kmerMatches)
     pruning_steps = 10
     max_pruning_fraction = 0.15
     
-    #Prune kmers
+    # Prune kmers
     for i in 1 : pruning_steps
         if kmerMetrics.n <= 2
             break
@@ -292,7 +296,9 @@ function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::A
     return kmerPath
 end
 
-function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float64, 2}, match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score::Float64 = -1.0, kmerLength::Int64 = 12)
+function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float64, 2}, match_moves::Vector{Move}, 
+    vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score::Float64 = -1.0, kmerLength::Int64 = 12,
+    clean_up_flag=false::Bool, codon_matching_enabled=false::Bool, codon_match_bonus::Float64 = -1.0)
     
     # Abbreviations
     k = kmerLength
@@ -316,14 +322,15 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Arra
         kmer.posB += (3-offset_from_codon_boundary)+4
         if !(kmer.posA == prevA + k && kmer.posB == prevB + k)
             if prevA == -k+1 && prevB == -k+1
-                alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_score_matrix, match_moves, vgap_moves, hgap_moves, extension_score, true, false)[1:2]
+                alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_score_matrix, 
+                            match_moves, vgap_moves, hgap_moves, extension_score, true, false, clean_up_flag, codon_matching_enabled, codon_match_bonus)
                 #@show alignment
                 result .*= alignment
             else
                 # NOTE that this only works on vertical_phase if the global vertical_phase is 0
                 local_vgap = updateMovePhase(vgap_moves, prevA+k, prevB+k)
                 local_hgap = updateMovePhase(hgap_moves, prevA+k, prevB+k)
-                alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_score_matrix, match_moves, local_vgap, local_hgap, extension_score, false, false)[1:2]
+                alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_score_matrix, match_moves, local_vgap, local_hgap, extension_score, false, false, clean_up_flag, codon_matching_enabled, codon_match_bonus)
                 #println("h")
                 #@show alignment
                 #@show extension_score
@@ -341,7 +348,7 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Arra
     # NOTE that this only works on vertical_phase if the global vertical_phase is 0
     local_vgap = updateMovePhase(vgap_moves, prevA+k, prevB+k)
     local_hgap = updateMovePhase(hgap_moves, prevA+k, prevB+k)
-    result .*= nw_align(A[prevA + k : m], B[prevB + k : n], match_score_matrix, match_moves, local_vgap, local_hgap, extension_score, false, true)[1:2]
+    result .*= nw_align(A[prevA + k : m], B[prevB + k : n], match_score_matrix, match_moves, local_vgap, local_hgap, extension_score, false, true, clean_up_flag, codon_matching_enabled, codon_match_bonus)
 
     return result
 end
