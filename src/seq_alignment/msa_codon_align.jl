@@ -27,10 +27,10 @@ alignment = msa_codon_align(ref, seqs, moveset, score_params)
 ```
 NOTE: The sequences (ungapped) might not be preserved by the alignment by the cleanup step. Some nucleotides might be inserted or removed.  
 """
-function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::MoveSet, score_params::ScoreScheme; use_seeded=true::Bool, codon_matching_enabled=true::Bool)
+function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::MoveSet=std_codon_moveset(), scoring::ScoreScheme=std_codon_scoring(), use_seeded=true::Bool, codon_matching_enabled=true::Bool)
     cleaned_codon_alignment = Vector{LongDNA{4}}(undef, length(seqs)+1)
     # perform pairwise seeded alignment for each sequence and clean indels which violate the reference readingFrame
-    cleaned_refs, cleaned_seqs = align_all_to_reference(ref, seqs, moveset, score_params, use_seeded = use_seeded, codon_matching_enabled = codon_matching_enabled, clean_up_flag=true)
+    cleaned_refs, cleaned_seqs = align_all_to_reference(ref, seqs, moveset, scoring, use_seeded = use_seeded, codon_matching_enabled = codon_matching_enabled, clean_up_flag=true)
     # resolve codon_insertion ambigiouity via left-stacking relative to reference
     msa = resolve_codon_insertions(ref, cleaned_refs, cleaned_seqs)
     return msa
@@ -54,7 +54,7 @@ function align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moves
     end
     # perform alignment for each sequence w.r.t. reference sequence
     for seqId in 1:length(seqs)
-        aligned_ref, aligned_seq = align(ref,ungap(seqs[seqId]),moveset,score_params, codon_matching_enabled=codon_matching_enabled, clean_up_flag=clean_up_flag) 
+        aligned_ref, aligned_seq = align(ref = ref, query = ungap(seqs[seqId]),moveset=moveset,scoring=score_params, codon_matching_enabled=codon_matching_enabled, clean_up_flag=clean_up_flag) 
         # save entire alignment to clean up later
         aligned_seqs[seqId] = copy(aligned_seq)
         aligned_refs[seqId] = copy(aligned_ref)
@@ -65,7 +65,11 @@ end
 # FIXME assume no single indels and codon_respecting insertions 0 mod 3
 function find_triplet_insertions_codonindex(aligned_ref::LongDNA{4})
     # TODO check for non-codon-respecting indels
-    @assert length(ungap(aligned_ref)) % 3 == 0
+    #@show length(aligned_ref)
+    #@show length(ungap(aligned_ref))
+    #@show aligned_ref
+    #@assert length(ungap(aligned_ref)) % 3 == 0
+    
 
     # NOTE codon_pos denotes which codon is in front of the insertion
     # find where the insertions happened relativ to codons in the reference

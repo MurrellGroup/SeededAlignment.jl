@@ -39,7 +39,7 @@ struct ScoreScheme
 end
 
 function ScoreScheme(; match_score=0.0, mismatch_score=0.7,extension_score=0.4,
-		codon_match_bonus=-1.0, edge_ext_begin=true,edge_ext_end=true,kmerlength=18)
+		codon_match_bonus=-2.0, edge_ext_begin=true,edge_ext_end=true,kmerlength=18)
 	return ScoreScheme(match_score,mismatch_score,extension_score,edge_ext_begin,
 		edge_ext_end,codon_match_bonus,kmerlength)
 end
@@ -81,7 +81,7 @@ function std_codon_scoring()
 	edge_ext_begin = true
 	edge_ext_end = true
 	# (opt arg) if codon_matching_enabled in aligner function
-	codon_match_bonus = -1.0
+	codon_match_bonus = -2.0
 	# (opt arg) if seeding
 	kmerlength = 18
 

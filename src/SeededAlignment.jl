@@ -17,11 +17,6 @@ include("seq_alignment/clean_alignment_readingframe.jl")
 include("seq_alignment/needleman_wunsch.jl")
 include("seq_alignment/seed_chain_align.jl")
 include("seq_alignment/msa_codon_align.jl")
-
-
-
-
-
 export 
     # Alignment Methods
     msa_codon_align, seed_chain_align, nw_align,

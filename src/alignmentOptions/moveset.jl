@@ -137,7 +137,7 @@ end
     pairwise_noisy_moveset()
 
 """
-function pairwise_noisy_moveset()
+function std_noisy_moveset()
     match_moves = [Move(1,.0)]
     vert_moves = [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,1,0, true)]
     hor_moves =  [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,1,0, true)]

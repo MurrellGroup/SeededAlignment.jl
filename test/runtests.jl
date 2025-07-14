@@ -1,181 +1,178 @@
-using SeededAlignment
+using Test
 
 # test dependencies
+using SeededAlignment
 using BioSequences
-using Test
 using Random
-using Distributions
 
-include("sequence_generator.jl")
+# TODO compare fast_translate to BioSequences.translate
 
 @testset "SeededAlignment.jl" begin
-
-    @testset "needleman-wunsch non-affine" begin
-
-        @testset "test for general alignment output" begin
-
-            for _ in 1:1
-                A, B = generate_seq_pair(120, 0.1, 0.2, 0.01, 0.01, 10)
-                # default moveset (note symmetric in horizontal and vertical)
-                match_moves = [Move(1, 0.0,1,0), Move(3, 0.0,1,0)]
-                gap_moves =   [Move(1, 2.2,1,0), Move(3, 2.0,1,0)]
-                alignment = nw_align(A, B, 0.0, 0.5, match_moves, gap_moves, gap_moves, true)
-
-                @testset "ungapped Alignment Is Equal To Input sequence & Alignments Have Same Length" begin
-                    ungapped_aligned_A = ungap(alignment[1])
-                    ungapped_aligned_B = ungap(alignment[2])
-                    # test that the sequences are unmodified
-                    @test ungapped_aligned_A == A
-                    @test ungapped_aligned_B == B
-                    # additionally assert that alignments have the same length
-                    @test length(alignment[1]) == length(alignment[2])
-                end
-
-                # doesn't hold currently because non-associativity of floates. 
-                #@testset "alignment is symmetric in A and B if vertical and horizontal moves are the same" begin
-                #    alignment_symmetric = nw_align(B, A, 0.0, 0.5, match_moves, gap_moves, gap_moves, true)
-                #    @test alignment_symmetric[2] == alignment[1]
-                #    @test alignment_symmetric[1] == alignment[2]
-                #end
-
-                #@testset "alignment Is Reverse Complement Symmetric" begin
-                    # TODO see if it can be made reverse complement symmetric
-                    # Fails mainly due to not being an affine alignment, more global solutions
-                    # If possible it would depend on how the Backtracking is done...
-
-                #    A_reverse_complement = reverse_complement(LongDNA{4}(string(A)))
-                #    B_reverse_complement = reverse_complement(LongDNA{4}(string(B)))
-                #    alignment_reverse_complement = nw_align(A_reverse_complement, B_reverse_complement, .0, 0.5, match_moves, gap_moves, gap_moves,true)
-
-                    # test if the alignment are the same
-                    #=println("reverse complement")
-                    println(alignment_reverse_complement[1])
-                    println(alignment_reverse_complement[2])
-                    println("normal")
-                    println(reverse_complement(LongDNA{4}(string(alignment[1]))))
-                    println(reverse_complement(LongDNA{4}(string(alignment[2]))))
-                    println("test scores match")
-                    println("reversecomplement: ", alignment_reverse_complement[3])
-                    println("normal: ", alignment[3])=#
-                #    @test alignment_reverse_complement[3] == alignment[3]
-                #    @test alignment_reverse_complement[1] == reverse_complement(LongDNA{4}(string(alignment[1]))) skip=true    
-                #    @test alignment_reverse_complement[2] == reverse_complement(LongDNA{4}(string(alignment[2]))) skip=true    
-                #end
-            end
+    @testset "1. noisy alignment nw_affine" begin
+        Random.seed!(42)
+        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 2001)
+        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1980)
+        aligned_A, aligned_B = nw_align(A, B)
+        # 1.1 alignment doesn't alter the underlying sequences
+        @testset "1.1 alignment doesn't alter the underlying sequences" begin
+            @test ungap(aligned_A) == A && ungap(aligned_B) == B
         end
-    end
-
-    # NW-affine unittest
-    @testset "needleman-wunsch affine" begin
-        A, B = generate_seq_pair(120, 0.01, 0.02, 0.01, 0.01, 7)
-        # TODO add stride and phase example, extensionable test
-
-        @testset "ungapped Alignment Is Equal To Input sequence & Alignments Have Same Length" begin
-            match_moves = [Move(1, 0.0,1,0), Move(3, 0.0,1,0)]
-            gap_moves = [Move(3, 1.0,1,0,true), Move(1, 0.9, 1,0,true)]
-            alignment_aff = nw_align(A, B, .0, 0.5, match_moves, gap_moves, gap_moves, 0.3,true,true,true)
-            ungapped_aligned_A = ungap(alignment_aff[1])
-            ungapped_aligned_B = ungap(alignment_aff[2])
-            # test that the sequences are unmodified
-            @test ungapped_aligned_A == A
-            @test ungapped_aligned_B == B
-            # additionally assert that alignments have the same length
-            @test length(alignment_aff[1]) == length(alignment_aff[2])
+        # 1.2 aligned_sequences have the same length
+        @testset "1.2 aligned_sequences have the same length" begin
+	        @test length(aligned_A) == length(aligned_B)
         end
-
-        @testset "start and ending extension" begin
-            score_params = ScoreScheme(match_score=0.0, mismatch_score=0.3, extension_score=0.4, edge_ext_begin=true,edge_ext_end=true, kmerlength=30)
+        # 1.3 start and ending extension
+        @testset "1.3 start and ending extension" begin
             C = LongDNA{4}("TTTAAAGGG")
             D = LongDNA{4}("AAAGGGCCC")
-            move_set = MoveSet(match_moves = [Move(1, 0.0, 1, 0, 1, 0, false)],
-                            hor_moves = [Move(3, 30, 1, 0, 1, 0, true)],
-                            vert_moves = [Move(3, 30, 1, 0, 1, 0, true)]
-                        )
-            alignment = nw_align(C,D,move_set,score_params)
-            # test is matches expected output
+            # we test if we get different alignments from tweaking the boolean parameters
+            score_params_on = ScoreScheme(match_score=0.0, mismatch_score=0.3, extension_score=0.4, edge_ext_begin=true,edge_ext_end=true)
+            score_params_off = ScoreScheme(match_score=0.0, mismatch_score=0.3, extension_score=0.4, edge_ext_begin=false,edge_ext_end=false)
+            move_set = MoveSet(
+                match_moves = [Move(1, 0.0, 1, 0, 1, 0, false)],
+                hor_moves = [Move(3, 30, 1, 0, 1, 0, true)],
+                vert_moves = [Move(3, 30, 1, 0, 1, 0, true)]
+            )
+            
+            # test start and end extension on
+            alignment = nw_align(C,D,moveset = move_set,scoring = score_params_on)
             @test alignment[1] == LongDNA{4}("TTTAAAGGG---")
             @test alignment[2] == LongDNA{4}("---AAAGGGCCC")
-            score_params = ScoreScheme(match_score=0.0, mismatch_score=0.3, extension_score=0.4, edge_ext_begin=false,edge_ext_end=false, kmerlength=30)
-            alignment = nw_align(C,D,move_set,score_params)
+            
+            # test start and end extension off
+            alignment = nw_align(C,D,moveset = move_set,scoring =score_params_off)
             @test alignment[1] == LongDNA{4}("TTTAAAGGG")
             @test alignment[2] == LongDNA{4}("AAAGGGCCC")
         end
-
-        # think might be true because there is rarely an insertion/deletion ambiguity
-        @testset "alignment is symmetric in A and B if vertical and horizontal moves are the same" begin
-            match_moves = [Move(1, 0.0,1,0), Move(3, 0.0,1,0)]
-            gap_moves = [Move(3, 1.0,1,0,true), Move(1, 0.9, 1,0,true)]
-            alignment_aff = nw_align(A, B, .0, 0.5, match_moves, gap_moves, gap_moves, 0.3,true,true,true)
-            alignment_symmetric = nw_align(B, A, .0, 0.5, match_moves, gap_moves, gap_moves,0.3,true,true,true)
-            @test alignment_symmetric[2] == alignment_aff[1]
-            @test alignment_symmetric[1] == alignment_aff[2]
+        # 1.4 type stability
+        @testset "1.4 type stability" begin
+            @test typeof(@inferred nw_align(A,B)) == Tuple{LongDNA{4},LongDNA{4}}
         end
 
-        # This cannot be true for synthetic data but might be true in practice with real data. 
-        #@testset "alignment Is Reverse Complement Symmetric" begin
-        #    match_moves = [Move(1, 0.0,1,0), Move(3, 0.0,1,0)]
-        #    gap_moves = [Move(3, 1.0,1,0,true), Move(1, 0.9, 1,0,true)]
-        #    alignment_aff = nw_align(A, B, .0, 0.5, match_moves, gap_moves, gap_moves, 0.3,true,true,true)
-        #    A_reverse_complement = reverse_complement(LongDNA{4}(string(A)))
-        #    B_reverse_complement = reverse_complement(LongDNA{4}(string(B)))
-        #    alignment_reverse_complement = nw_align(A_reverse_complement, B_reverse_complement, .0, 0.5, match_moves, gap_moves, gap_moves, 0.3,true,true,true)
-        ##    # test if the alignment are the same
-        #    println(alignment_reverse_complement[1])
-        #    println(alignment_reverse_complement[2])
-        #    println(reverse_complement(LongDNA{4}(string(alignment_aff[1]))))
-        #    println(reverse_complement(LongDNA{4}(string(alignment_aff[2]))))
-        #    @test alignment_reverse_complement[3] ≈ alignment_aff[3]
-        #    @test alignment_reverse_complement[1] == reverse_complement(LongDNA{4}(string(alignment_aff[1])))
-        #    @test alignment_reverse_complement[2] == reverse_complement(LongDNA{4}(string(alignment_aff[2])))
-        #end
+        
     end
 
-    # Seed Chain Align
-    @testset "seed_chain_alignment" begin
-        A, B = generate_seq_pair(120, 0.05, 0.1, 0.01, 0.01, 7)
-        # TODO add stride and phase example, begin and end extensions
-        match_moves = [Move(1, 0.0,1,0), Move(3, 0.0,1,0)]
-        gap_moves = [Move(3, 1.0,1,0), Move(1, 2.0, 1,0)]
-        alignment = seed_chain_align(A, B, .0, 0.5, match_moves, gap_moves, gap_moves, 0.3, 12)
+    # TODO finish this test case
+    #@testset "2. ref alignment nw_affine" begin
+    #     move_set = MoveSet(
+    #            match_moves = [Move(1, 0.0, 1, 0, 1, 0, false)],
+    #            hor_moves = [Move(3, 30, 1, 0, 1, 0, true)],
+    #            vert_moves = [Move(3, 30, 1, 0, 1, 0, true)]
+    #        )
+    #    Random.seed!(42)
+    #    A = LongDNA{4}()
+    #    B = LongDNA{4}()
+    #    # reference informed alignment
+    #    aligned_A, aligned_B = nw_align(ref = A, query = B, clean_up_flag=true)
+    #    # 2.1 indels don't break codon readingframe
+    #    @test aligned_A == cleaned_A
+    #    @test aligned_B == cleaned_B
+    #end
 
-        @testset "ungapped Alignment Is Equal To Input" begin
-            ungapped_aligned_A = ungap(alignment[1])
-            ungapped_aligned_B = ungap(alignment[2])
-            @test ungapped_aligned_A == A
-            @test ungapped_aligned_B == B
-            # additionally assert that alignments have the same length
-            @test length(alignment[1]) == length(alignment[2])
+    @testset "3. noisy alignment seed_chain_align" begin 
+        Random.seed!(42)
+        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 2001)
+        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1980)
+        aligned_A, aligned_B = seed_chain_align(A, B)
+        # 3.1 alignment doesn't alter the underlying sequences
+        @testset "3.1 alignment doesn't alter the underlying sequences" begin
+            @test ungap(aligned_A) == A && ungap(aligned_B) == B
+        end
+        # 3.2 aligned_sequences have the same length
+        @testset "3.2 aligned_sequences have the same length" begin
+	        @test length(aligned_A) == length(aligned_B)
+        end
+        # 3.3 type stability
+        @testset "3.3 type stability" begin
+            @test typeof(@inferred seed_chain_align(A,B)) == Tuple{LongDNA{4},LongDNA{4}}
         end
 
-        #@testset "alignment is symmetric in A and B if vertical and horizontal moves are the same" begin
-        #    alignment_symmetric = seed_chain_align(B, A, .0, 0.5, match_moves, gap_moves, gap_moves, 0.3, 12)
-        #    println(alignment[1])
-        #    println(alignment_symmetric[2])
-        #    @test alignment_symmetric[2] == alignment[1]
-        #    println(alignment[2])
-        #    println(alignment_symmetric[1])
-        #    @test alignment_symmetric[1] == alignment[2]
-        #end
-
-        #@testset "alignment Is Reverse Complement Symmetric" begin
-        #    A_reverse_complement = reverse_complement(LongDNA{4}(string(A)))
-        #    B_reverse_complement = reverse_complement(LongDNA{4}(string(B)))
-        #    alignment_reverse_complement = seed_chain_align(A_reverse_complement, B_reverse_complement, .0, 0.5, match_moves, gap_moves, gap_moves, 0.3)
-            # test if the alignment are the same
-            #println("A")
-            #println(alignment_reverse_complement[1])
-            #println(complement(LongDNA{4}(reverse(string(alignment[1])))))
-        #    @test alignment_reverse_complement[1] == complement(LongDNA{4}(reverse(string(alignment[1])))) skip=true  
-            #println("B")
-            #println(alignment_reverse_complement[2])
-            #println(complement(LongDNA{4}(reverse(string(alignment[2])))))
-        #    @test alignment_reverse_complement[2] == complement(LongDNA{4}(reverse(string(alignment[2])))) skip=true  
-        #end
     end
 
-    # msa_codon_align
+    # TODO finish this test case 
+    #@testset "4. ref alignment seed_chain_align" begin
+    #    Random.seed!(42)
+    #    A = LongDNA{4}()
+    #    B = LongDNA{4}()
+    #    # reference informed alignment
+    #    aligned_A, aligned_B = seed_chain_align(ref = A, query = B)
+    #end
 
-    # clean_up
+    @testset "5. msa_codon_align" begin
+        Random.seed!(42)
+        ref = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 51)
+        seqs = Vector{LongDNA{4}}(undef, 20)
+        for i in 1:20
+            seqs[i] = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 33+i)
+        end
+
+	    # 5.1 aligned_sequences have the same length
+        @testset "5.1 aligned_sequences have the same length" begin
+            msa = msa_codon_align(ref, seqs)
+            n = length(msa[1])
+            for i in 1:20
+                @test n == length(msa[i+1])
+            end
+        end
+        # 5.2 test indels not break codon readingframe after clean_up
+        @testset "5.2 test indels not break codon readingframe after clean_up" begin
+            msa = msa_codon_align(ref, seqs)
+            aligned_ref = msa[1]
+            for i in 1:20
+                cleaned_ref, cleaned_seq = clean_alignment_readingframe(aligned_ref, msa[i+1])
+                @test cleaned_seq == msa[i+1]
+            end
+        end
+        # 5.3 type stability
+        @testset "5.3 type stability" begin
+            @test typeof(@inferred msa_codon_align(ref, seqs)) == Vector{LongDNA{4}}
+        end
+
+    end
+    
+	@testset "6. clean_frameshifts" begin
+        # 6.1 cleaning alignments which don't have frameshift mutations
+        @testset "6.1 cleaning alignments which don't have frameshift mutations" begin
+            A_no_frameshift = LongDNA{4}("---ATG---CCATTG---")
+            B_no_frameshift = LongDNA{4}("TTTATGTCC---TTGTTT")
+            A_cleaned, B_cleaned = clean_alignment_readingframe(A_no_frameshift,B_no_frameshift)
+            @test A_cleaned == A_no_frameshift
+            @test B_cleaned == B_no_frameshift
+        end
+
+        # 6.2 clean single insertion and single deletion
+        @testset "6.2 clean single insertion and single deletion" begin
+            A_frameshift = LongDNA{4}("ATG-CCA")
+            B_frameshift = LongDNA{4}("ATGTCC-")
+            A_cleaned, B_cleaned = clean_alignment_readingframe(A_frameshift,B_frameshift)
+            @test A_cleaned == LongDNA{4}("ATGCCA")
+            @test B_cleaned == LongDNA{4}("ATGCCN")
+        end
+        
+        # 6.3 insertion of length 4 and deletion of length 4 which starts on codon boundary
+        @testset "6.3 insertion of length 4 and deletion of length 4 which starts on codon boundary" begin
+            A_frameshift = LongDNA{4}("ATG----CCATTG")
+            B_frameshift = LongDNA{4}("ATGTTTT----TG")
+            A_cleaned, B_cleaned = clean_alignment_readingframe(A_frameshift,B_frameshift)
+            @test A_cleaned == LongDNA{4}("ATG---CCATTG")
+            @test B_cleaned == LongDNA{4}("ATGTTT---NTG")
+        end
+        
+        
+        # 6.4 insertions and deletions which cross codon boundaries and doesn't start on a boundary
+        @testset "6.4 insertions and deletions which cross codon boundaries and doesn't start on a boundary" begin
+            A_frameshift = LongDNA{4}("ATGA-----CCATT")
+            B_frameshift = LongDNA{4}("ATGATTTTT---TG")
+            A_cleaned, B_cleaned = clean_alignment_readingframe(A_frameshift,B_frameshift)
+            @test A_cleaned == LongDNA{4}("ATGACCATT")
+            @test B_cleaned == LongDNA{4}("ATGANNNTG")
+        end
+        
+        # 6.5 type stability
+        @testset "6.5 type stability" begin
+            A_frameshift = LongDNA{4}("ATGA-----CCATT")
+            B_frameshift = LongDNA{4}("ATGATTTTT---TG")
+            @test typeof(@inferred clean_alignment_readingframe(A_frameshift,B_frameshift)) == Tuple{LongDNA{4},LongDNA{4}}
+        end
+    end
 end
-
-# TODO unittest for cleanup_functions
