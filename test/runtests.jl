@@ -105,7 +105,6 @@ using Random
         for i in 1:20
             seqs[i] = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 33+i)
         end
-
 	    # 5.1 aligned_sequences have the same length
         @testset "5.1 aligned_sequences have the same length" begin
             msa = msa_codon_align(ref, seqs)
@@ -151,7 +150,6 @@ using Random
             @test A_cleaned == A_no_frameshift
             @test B_cleaned == B_no_frameshift
         end
-
         # 6.2 clean single insertion and single deletion
         @testset "6.2 clean single insertion and single deletion" begin
             A_frameshift = LongDNA{4}("ATG-CCA")
@@ -160,7 +158,6 @@ using Random
             @test A_cleaned == LongDNA{4}("ATGCCA")
             @test B_cleaned == LongDNA{4}("ATGCCN")
         end
-        
         # 6.3 insertion of length 4 and deletion of length 4 which starts on codon boundary
         @testset "6.3 insertion of length 4 and deletion of length 4 which starts on codon boundary" begin
             A_frameshift = LongDNA{4}("ATG----CCATTG")
@@ -169,8 +166,6 @@ using Random
             @test A_cleaned == LongDNA{4}("ATG---CCATTG")
             @test B_cleaned == LongDNA{4}("ATGTTT---NTG")
         end
-        
-        
         # 6.4 insertions and deletions which cross codon boundaries and doesn't start on a boundary
         @testset "6.4 insertions and deletions which cross codon boundaries and doesn't start on a boundary" begin
             A_frameshift = LongDNA{4}("ATGA-----CCATT")
@@ -179,7 +174,6 @@ using Random
             @test A_cleaned == LongDNA{4}("ATGACCATT")
             @test B_cleaned == LongDNA{4}("ATGANNNTG")
         end
-        
         # 6.5 type inferrence
         @testset "6.5 type inferrence" begin
             A_frameshift = LongDNA{4}("ATGA-----CCATT")
