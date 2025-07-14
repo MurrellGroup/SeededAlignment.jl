@@ -26,22 +26,35 @@ score_params = ScoreScheme(extension_score = 0.3, mismatch_score = 0.7) # (every
 ```
 """
 struct ScoreScheme
-    match_score::Float64
-	mismatch_score::Float64
+	# 1=A, 2=C, 3=G, 4=T for both row and column indicies
+	nucleotide_score_matrix::Matrix{Float64}
+	# extending gap penalty
 	extension_score::Float64
-	# start and end extension bools
+	# start and end extension bools 
 	edge_ext_begin::Bool
 	edge_ext_end::Bool
 	# (opt arg) if codon_matching_enabled in aligner function
+	# TODO add opt arg for codon scoring matrix
 	codon_match_bonus::Float64
 	# (opt arg) if seeding
 	kmerlength::Int64
+	
 end
 
-function ScoreScheme(; match_score=0.0, mismatch_score=0.7,extension_score=0.4,
-		codon_match_bonus=-2.0, edge_ext_begin=true,edge_ext_end=true,kmerlength=18)
-	return ScoreScheme(match_score,mismatch_score,extension_score,edge_ext_begin,
-		edge_ext_end,codon_match_bonus,kmerlength)
+# ScoreScheme construction wrapper
+function ScoreScheme(; nucleotide_score_matrix::Union{Matrix{Float64},Nothing}=nothing, match_score::Float64 = 0.0, mismatch_score::Float64=0.7,
+		extension_score::Float64=0.4, edge_ext_begin=true::Bool, edge_ext_end=true::Bool, 
+		codon_match_bonus::Float64=-2.0, kmerlength::Int64=18)
+
+	# give a default simple match/mismatch matrix if no score_matrix provided
+	if nucleotide_score_matrix == nothing
+		nucleotide_score_matrix = simple_match_penalty_matrix(match_score, mismatch_score)
+	end
+	# call actual constructor
+	return ScoreScheme(nucleotide_score_matrix,extension_score,
+		edge_ext_begin,edge_ext_end,
+		codon_match_bonus,kmerlength
+	)
 end
 
 import Base: show
@@ -69,13 +82,15 @@ Return a standard codon-aware `ScoreScheme` for alignment.
 - Mismatch score: `0.3`
 - Gap extension score: `0.1`
 - Allow extension at sequence ends: `true` (both ends)
-- K-mer length for seeding: `21`
+- K-mer length for seeding: `18`
 
 Use this as a default `ScoreScheme` for codon-preserving alignments.
 """
 function std_scoring()
+	# params for nucleotide_score_matrix
 	match_score = 0.0
 	mismatch_score = 0.7
+	# scoring stuff
 	extension_score = 0.4
 	# start and end extension bools
 	edge_ext_begin = true
@@ -85,5 +100,12 @@ function std_scoring()
 	# (opt arg) if seeding
 	kmerlength = 18
 
-	return ScoreScheme(match_score,mismatch_score,extension_score,edge_ext_begin,edge_ext_end,codon_match_bonus,kmerlength)
+	return ScoreScheme(match_score=match_score,
+					   mismatch_score=mismatch_score,
+					   extension_score=extension_score,
+					   edge_ext_begin=edge_ext_begin,
+					   edge_ext_end=edge_ext_end,
+					   codon_match_bonus=codon_match_bonus,
+					   kmerlength=kmerlength
+	)
 end

@@ -6,45 +6,39 @@
 
 """
 # needleman_wunsch wrapper - default noisy i.e no reference sequence
-function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoreScheme=std_scoring(), clean_up_enabled=false::Bool, codon_matching_enabled=false::Bool)
-    # unpack arguments and call another nw_align
+function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoreScheme=std_scoring())
+    # force no clean_up
+    clean_up_enabled=false
+    verbose=false
+    # force no codon_matching_enabled
+    codon_matching_enabled=false
+    # unpack arguments and call the internal alignment function
     nw_align(
-        A, B, scoring.match_score, scoring.mismatch_score, moveset.match_moves,
-        moveset.vert_moves, moveset.hor_moves, scoring.extension_score,
-        scoring.edge_ext_begin, scoring.edge_ext_end, clean_up_enabled,
-        codon_matching_enabled, scoring.codon_match_bonus
+        A, B, moveset.match_moves, moveset.vert_moves, moveset.hor_moves, 
+        scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_match_bonus,
+        scoring.edge_ext_begin, scoring.edge_ext_end, codon_matching_enabled, clean_up_enabled, verbose
     )
 end
 
 # needleman_wunsch wrapper - default reference informed
-function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_codon_moveset(), scoring::ScoreScheme=std_scoring(), clean_up_enabled=false::Bool, codon_matching_enabled=true::Bool)
-    # unpack arguments and call another nw_align
+function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_codon_moveset(), scoring::ScoreScheme=std_scoring(), 
+    clean_up_enabled=false::Bool, verbose=false::Bool, codon_matching_enabled=true::Bool)
+    # unpack arguments and call the internal alignment function
     nw_align(
-        ref, query, scoring.match_score, scoring.mismatch_score, moveset.match_moves,
-        moveset.vert_moves, moveset.hor_moves, scoring.extension_score,
-        scoring.edge_ext_begin, scoring.edge_ext_end, clean_up_enabled,
-        codon_matching_enabled, scoring.codon_match_bonus
+        ref, query, moveset.match_moves, moveset.vert_moves, moveset.hor_moves, 
+        scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_match_bonus,
+        scoring.edge_ext_begin, scoring.edge_ext_end, codon_matching_enabled, clean_up_enabled, verbose
     )
 end
 
-# internal wrapper to create score matrix and call alignment function
-function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score::Float64, mismatch_score::Float64, 
-        match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score::Float64, 
-        edge_extension_begin=false::Bool, edge_extension_end=false::Bool, clean_up_enabled=false::Bool, 
-        codon_matching_enabled=false::Bool, codon_match_score::Float64 = -2.0)
+# Needleman Wunsch alignment with affine scoring
+function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, 
+    match_score_matrix::Matrix{Float64}, extension_score::Float64, codon_match_bonus::Float64 =-2.0, edge_extension_begin=false::Bool, 
+    edge_extension_end=false::Bool, codon_matching_enabled=false::Bool, clean_up_enabled=false::Bool, verbose=false::Bool)
+    
     # throw exception if invalid alphabet in LongDNA{4}
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), B) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
-    # call the proper alignment function
-    nw_align(A, B, simple_match_penalty_matrix(match_score, mismatch_score), 
-        match_moves, vgap_moves, hgap_moves, extension_score, edge_extension_begin, edge_extension_end, 
-        clean_up_enabled, codon_matching_enabled, codon_match_score) 
-end
-
-# Needleman Wunsch alignment with affine scoring
-function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float64, 2}, match_moves::Vector{Move}, vgap_moves::Vector{Move},
-    hgap_moves::Vector{Move}, extension_score::Float64, edge_extension_begin=false::Bool, edge_extension_end=false::Bool, 
-    clean_up_enabled=false::Bool, codon_matching_enabled=false::Bool, codon_match_bonus::Float64 =-2.0)
     
     n, m = length(A), length(B)
     # Do non-affine NW
@@ -358,7 +352,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float6
     aligned_B = reverse(res_B)
     # clean_up single indels if enabled
     if clean_up_enabled
-        aligned_A, aligned_B = clean_frameshifts(aligned_A, aligned_B)
+        aligned_A, aligned_B = clean_frameshifts(aligned_A, aligned_B, verbose=verbose)
     end
     # return alignment
     return aligned_A, aligned_B
@@ -368,10 +362,12 @@ end
 
 # Convert NucleicAcid to integer A -> 1, C -> 2, G -> 3, T -> 4
 toInt(x::NucleicAcid) = trailing_zeros(reinterpret(UInt8, x)) + 1
-
+# default match_score_matrix
 function simple_match_penalty_matrix(match_score, mismatch_score, n=4)
     m = fill(mismatch_score, n, n)
-    m[diagind(m)] .= match_score
+    for i in 1:n
+        m[i,i] = match_score
+    end
     return m
 end
 

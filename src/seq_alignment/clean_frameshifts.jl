@@ -152,7 +152,7 @@ function clean_frameshifts(aligned_ref::LongDNA{4},aligned_seq::LongDNA{4};verbo
     # explain results of clean_up
     if verbose
         if total_num_of_clean_up_operations != 0
-            println("Alignment had frameshift mutations - in total $total_num_insertion_gaps_cleaned insertions were removed and $total_num_deletion_gaps_cleaned ambigious nucleotides added to non-reference sequence")
+            println("Alignment had frameshift mutations:\nIn total $total_num_insertion_gaps_cleaned insertion(s) were removed and $total_num_deletion_gaps_cleaned ambigious nucleotide(s) were added to non-reference sequence")
         else
             println("Alignment has no frameshift mutations - no clean up needed.")
         end

@@ -1,6 +1,5 @@
 module SeededAlignment
 
-using LinearAlgebra
 using BioSequences
 using FASTX
 
