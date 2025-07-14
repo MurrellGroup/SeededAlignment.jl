@@ -127,7 +127,19 @@ using Random
         @testset "5.3 type inferrence" begin
             @test typeof(@inferred msa_codon_align(ref, seqs)) == Vector{LongDNA{4}}
         end
-
+        # 5.4 resolve_codon_insertions (internal method in msa_codon_align) handles codon insertions as expected
+        @testset "resolve_codon_insertions (internal method in msa_codon_align) handles codon insertions as expected" begin
+            ref = LongDNA{4}("ATGTTTCCCGGGTAA")
+            aligned_ref1 = LongDNA{4}("ATG---TTTCCCGGGTAA")
+            aligned_seq1 = LongDNA{4}("ATGTTTTTTCCCGGGTAA")
+            aligned_ref2 = LongDNA{4}("---ATG---TTTCCCGGGTAA---")
+            aligned_seq2 = LongDNA{4}("ATGATGTTTTTTCCCGGGTAAGGG")
+            msa = SeededAlignment.resolve_codon_insertions(ref,[aligned_ref1,aligned_ref2], [aligned_seq1,aligned_seq2])
+            # compare with expected scaffolded msa
+            @test msa[1] == LongDNA{4}("---ATG---TTTCCCGGGTAA---")
+            @test msa[2] == LongDNA{4}("---ATGTTTTTTCCCGGGTAA---")
+            @test msa[3] == LongDNA{4}("ATGATGTTTTTTCCCGGGTAAGGG")
+        end
     end
     
 	@testset "6. clean_frameshifts" begin
