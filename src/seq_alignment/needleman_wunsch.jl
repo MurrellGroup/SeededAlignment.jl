@@ -32,7 +32,10 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score::Float64, mismatch_s
         match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score::Float64, 
         edge_extension_begin=false::Bool, edge_extension_end=false::Bool, clean_up_enabled=false::Bool, 
         codon_matching_enabled=false::Bool, codon_match_score::Float64 = -2.0)
- 
+    # throw exception if invalid alphabet in LongDNA{4}
+    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
+    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), B) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
+    # call the proper alignment function
     nw_align(A, B, simple_match_penalty_matrix(match_score, mismatch_score), 
         match_moves, vgap_moves, hgap_moves, extension_score, edge_extension_begin, edge_extension_end, 
         clean_up_enabled, codon_matching_enabled, codon_match_score) 
