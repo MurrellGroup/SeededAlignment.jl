@@ -1,11 +1,11 @@
 """
-    seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::MoveSet, scoreScheme::ScoreScheme)
+    seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::Moveset, scoreScheme::ScoreScheme)
 Perform pairwise alignment between two DNA sequences using a seeding strategy.
 
 # Arguments
 - `A::LongDNA{4}`: The first DNA sequence to align.
 - `B::LongDNA{4}`: The second DNA sequence to align.
-- `moveset::MoveSet`: Defines allowed alignment moves (e.g., match, mismatch, gap).
+- `moveset::Moveset`: Defines allowed alignment moves (e.g., match, mismatch, gap).
 - `scoreScheme::ScoreScheme`: Scoring scheme for e.g. matches, mismatches, and gaps.
 
 # Returns
@@ -20,33 +20,33 @@ This function performs a fast (sub-quadratic) pairwise alignment using seeding a
 A = LongDNA{4}("ACGTACGT")
 B = LongDNA{4}("ACGTTGCA")
 moveset = std_codon_moveset()
-scoreScheme = std_codon_scoring()
+scoreScheme = std_scoring()
 
 alignment = seed_chain_align(A, B, moveset, scoreScheme)
 ```
 """
 
 # seed_chain_align wrapper - default noisy i.e no reference sequence
-function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}; moveset::MoveSet=std_noisy_moveset(), scoring::ScoreScheme=std_codon_scoring(), clean_up_flag=false::Bool, codon_matching_enabled=false::Bool)
+function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoreScheme=std_scoring(), clean_up_enabled=false::Bool, codon_matching_enabled=false::Bool)
     
     seed_chain_align(A, B, scoring.match_score, scoring.mismatch_score, moveset.match_moves, moveset.vert_moves, moveset.hor_moves, 
-        scoring.extension_score, scoring.kmerlength, clean_up_flag, codon_matching_enabled, scoring.codon_match_bonus)
+        scoring.extension_score, scoring.kmerlength, clean_up_enabled, codon_matching_enabled, scoring.codon_match_bonus)
 
 end
 
 # seed_chain_align wrapper - default reference informed
-function seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::MoveSet=std_codon_movest(), scoring::ScoreScheme=std_codon_scoring(), clean_up_flag=false::Bool, codon_matching_enabled=true::Bool)
+function seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_codon_movest(), scoring::ScoreScheme=std_scoring(), clean_up_enabled=false::Bool, codon_matching_enabled=true::Bool)
     seed_chain_align(ref, query, scoring.match_score, scoring.mismatch_score, moveset.match_moves, moveset.vert_moves, moveset.hor_moves, 
-        scoring.extension_score, scoring.kmerlength, clean_up_flag, codon_matching_enabled, scoring.codon_match_bonus)
+        scoring.extension_score, scoring.kmerlength, clean_up_enabled, codon_matching_enabled, scoring.codon_match_bonus)
 end
 
 # internal wrapper to create score matrix and call alignment function
 function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score::Float64, mismatch_score::Float64, 
         match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score::Float64, kmerLength::Int64 = 12,
-        clean_up_flag=false::Bool, codon_matching_enabled=false::Bool, codon_match_bonus::Float64 = -2.0)
+        clean_up_enabled=false::Bool, codon_matching_enabled=false::Bool, codon_match_bonus::Float64 = -2.0)
 
     return seed_chain_align(A, B, simple_match_penalty_matrix(match_score, mismatch_score), match_moves::Vector{Move}, 
-           vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score, kmerLength, clean_up_flag, codon_matching_enabled, codon_match_bonus)
+           vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score, kmerLength, clean_up_enabled, codon_matching_enabled, codon_match_bonus)
 end
 
 function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmerLength)
@@ -203,7 +203,7 @@ end
 
 function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float64, 2}, match_moves::Vector{Move}, 
     vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score::Float64 = -1.0, kmerLength::Int64 = 12,
-    clean_up_flag=false::Bool, codon_matching_enabled=false::Bool, codon_match_bonus::Float64 = -2.0)
+    clean_up_enabled=false::Bool, codon_matching_enabled=false::Bool, codon_match_bonus::Float64 = -2.0)
     
     # Abbreviations
     k = kmerLength
@@ -228,13 +228,13 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Arra
         if !(kmer.posA == prevA + k && kmer.posB == prevB + k)
             if prevA == -k+1 && prevB == -k+1
                 alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_score_matrix, 
-                            match_moves, vgap_moves, hgap_moves, extension_score, true, false, clean_up_flag, codon_matching_enabled, codon_match_bonus)
+                            match_moves, vgap_moves, hgap_moves, extension_score, true, false, clean_up_enabled, codon_matching_enabled, codon_match_bonus)
                 result .*= alignment
             else
                 # NOTE that this only works on vertical_phase if the global vertical_phase is 0
                 local_vgap = updateMovePhase(vgap_moves, prevA+k, prevB+k)
                 local_hgap = updateMovePhase(hgap_moves, prevA+k, prevB+k)
-                alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_score_matrix, match_moves, local_vgap, local_hgap, extension_score, false, false, clean_up_flag, codon_matching_enabled, codon_match_bonus)
+                alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_score_matrix, match_moves, local_vgap, local_hgap, extension_score, false, false, clean_up_enabled, codon_matching_enabled, codon_match_bonus)
                 result .*= alignment
             end
         end
@@ -245,7 +245,7 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Arra
     # NOTE that this only works on vertical_phase if the global vertical_phase is 0
     local_vgap = updateMovePhase(vgap_moves, prevA+k, prevB+k)
     local_hgap = updateMovePhase(hgap_moves, prevA+k, prevB+k)
-    result .*= nw_align(A[prevA + k : m], B[prevB + k : n], match_score_matrix, match_moves, local_vgap, local_hgap, extension_score, false, true, clean_up_flag, codon_matching_enabled, codon_match_bonus)
+    result .*= nw_align(A[prevA + k : m], B[prevB + k : n], match_score_matrix, match_moves, local_vgap, local_hgap, extension_score, false, true, clean_up_enabled, codon_matching_enabled, codon_match_bonus)
     # return result as Tuple
     return result[1], result[2]
 end

@@ -73,7 +73,7 @@ Return a standard codon-aware `ScoreScheme` for alignment.
 
 Use this as a default `ScoreScheme` for codon-preserving alignments.
 """
-function std_codon_scoring()
+function std_scoring()
 	match_score = 0.0
 	mismatch_score = 0.7
 	extension_score = 0.4

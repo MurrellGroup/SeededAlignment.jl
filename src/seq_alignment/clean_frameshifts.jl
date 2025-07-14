@@ -1,6 +1,6 @@
 
 """
-    clean_alignment_readingframe(aligned_ref::LongDNA{4},aligned_seq::LongDNA{4},verbose_flag::Bool=false)
+    clean_alignment_readingframe(aligned_ref::LongDNA{4},aligned_seq::LongDNA{4};verbose::Bool=false)
 
     Takes a pairwise alignment of a reference (with known reading frame) and a sequence, and removes single indels which
     don't respect the reference's reading frame.
@@ -8,7 +8,7 @@
     # NOTE We assume the readingFrame is 0 mod 3 with sequences 0 indexed
 """
 # TODO add verbose_clean_up to aligners
-function clean_alignment_readingframe(aligned_ref::LongDNA{4},aligned_seq::LongDNA{4},verbose_flag::Bool=false)
+function clean_frameshifts(aligned_ref::LongDNA{4},aligned_seq::LongDNA{4};verbose::Bool=false)
     # exception handling
     length(ungap(aligned_ref)) % 3 == 0 || throw(ArgumentError("The original reference sequence (ungap(aligned_ref)) must have length divisible by 3")) 
     !any((base_ref == '-') && (base_seq == '-') for (base_ref,base_seq) in zip(aligned_ref, aligned_seq)) || throw(ArgumentError("Both sequences have a gap at the same index, which therefore cannot be resolved")) 
@@ -16,7 +16,7 @@ function clean_alignment_readingframe(aligned_ref::LongDNA{4},aligned_seq::LongD
     # codon bookkeeping variables
     insertAddon = 0
     codon_length = length(ungap(aligned_ref))÷3
-    # only used if verbose_flag
+    # only used in verbose mode
     ref = ungap(aligned_ref)
     total_num_of_clean_up_operations = 0
     total_num_deletion_gaps_cleaned = 0
@@ -93,7 +93,7 @@ function clean_alignment_readingframe(aligned_ref::LongDNA{4},aligned_seq::LongD
         end
 
         # verbose visibility of edits made to the alignment
-        if verbose_flag && (num_insertion_gaps_cleaned != 0 || num_deletion_gaps_cleaned != 0)
+        if verbose && (num_insertion_gaps_cleaned != 0 || num_deletion_gaps_cleaned != 0)
             # update operation statistics
             total_num_deletion_gaps_cleaned += num_deletion_gaps_cleaned
             total_num_insertion_gaps_cleaned += num_insertion_gaps_cleaned
@@ -141,7 +141,7 @@ function clean_alignment_readingframe(aligned_ref::LongDNA{4},aligned_seq::LongD
         num_extra_insertion_gaps_cleaned = num_insertion_gap_after_last_codon % 3
         append!(cleaned_ref, aligned_ref[last_alignment_index+1:length(aligned_ref)-num_extra_insertion_gaps_cleaned])
         append!(cleaned_seq, aligned_seq[last_alignment_index+1:length(aligned_ref)-num_extra_insertion_gaps_cleaned])
-        if verbose_flag && (num_extra_insertion_gaps_cleaned != 0)
+        if verbose && (num_extra_insertion_gaps_cleaned != 0)
             # add the final operations to the tally
             total_num_insertion_gaps_cleaned += num_extra_insertion_gaps_cleaned
             total_num_of_clean_up_operations += num_extra_insertion_gaps_cleaned
@@ -150,7 +150,7 @@ function clean_alignment_readingframe(aligned_ref::LongDNA{4},aligned_seq::LongD
         end
     end
     # explain results of clean_up
-    if verbose_flag
+    if verbose
         if total_num_of_clean_up_operations != 0
             println("Alignment had frameshift mutations - in total $total_num_insertion_gaps_cleaned insertions were removed and $total_num_deletion_gaps_cleaned ambigious nucleotides added to non-reference sequence")
         else
@@ -158,21 +158,4 @@ function clean_alignment_readingframe(aligned_ref::LongDNA{4},aligned_seq::LongD
         end
     end
     return cleaned_ref, cleaned_seq
-end
-
-# TODO depricate
-function clean_alignment_readingframe(aligned_ref_vec::Vector{LongDNA{4}}, aligned_seq_vec::Vector{LongDNA{4}},verbose_flag::Bool=false)
-    
-    length(aligned_ref_vec) == length(aligned_seq_vec) || throw(ArgumentError("an equal number of references and non-references must be provided"))
-    n = length(aligned_ref_vec)
-
-    cleaned_refs = Vector{LongDNA{4}}(undef, length(aligned_ref_vec))
-    cleaned_seqs = Vector{LongDNA{4}}(undef, length(aligned_seq_vec))
-    for i in 1:n
-        if verbose_flag
-            println("Cleaning the $i:th sequence: subsequent edits may follow:")
-        end
-        cleaned_refs[i], cleaned_seqs[i] = clean_alignment_readingframe(aligned_ref_vec[i],aligned_seq_vec[i],verbose_flag)
-    end
-    return cleaned_refs, cleaned_seqs
 end

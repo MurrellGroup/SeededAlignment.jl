@@ -28,7 +28,7 @@ using Random
             # we test if we get different alignments from tweaking the boolean parameters
             score_params_on = ScoreScheme(match_score=0.0, mismatch_score=0.3, extension_score=0.4, edge_ext_begin=true,edge_ext_end=true)
             score_params_off = ScoreScheme(match_score=0.0, mismatch_score=0.3, extension_score=0.4, edge_ext_begin=false,edge_ext_end=false)
-            move_set = MoveSet(
+            move_set = Moveset(
                 match_moves = [Move(1, 0.0, 1, 0, 1, 0, false)],
                 hor_moves = [Move(3, 30, 1, 0, 1, 0, true)],
                 vert_moves = [Move(3, 30, 1, 0, 1, 0, true)]
@@ -44,8 +44,8 @@ using Random
             @test alignment[1] == LongDNA{4}("TTTAAAGGG")
             @test alignment[2] == LongDNA{4}("AAAGGGCCC")
         end
-        # 1.4 type stability
-        @testset "1.4 type stability" begin
+        # 1.4 type inferrence
+        @testset "1.4 type inferrence" begin
             @test typeof(@inferred nw_align(A,B)) == Tuple{LongDNA{4},LongDNA{4}}
         end
 
@@ -54,7 +54,7 @@ using Random
 
     # TODO finish this test case
     #@testset "2. ref alignment nw_affine" begin
-    #     move_set = MoveSet(
+    #     move_set = Moveset(
     #            match_moves = [Move(1, 0.0, 1, 0, 1, 0, false)],
     #            hor_moves = [Move(3, 30, 1, 0, 1, 0, true)],
     #            vert_moves = [Move(3, 30, 1, 0, 1, 0, true)]
@@ -82,8 +82,8 @@ using Random
         @testset "3.2 aligned_sequences have the same length" begin
 	        @test length(aligned_A) == length(aligned_B)
         end
-        # 3.3 type stability
-        @testset "3.3 type stability" begin
+        # 3.3 type inferrence
+        @testset "3.3 type inferrence" begin
             @test typeof(@inferred seed_chain_align(A,B)) == Tuple{LongDNA{4},LongDNA{4}}
         end
 
@@ -119,12 +119,12 @@ using Random
             msa = msa_codon_align(ref, seqs)
             aligned_ref = msa[1]
             for i in 1:20
-                cleaned_ref, cleaned_seq = clean_alignment_readingframe(aligned_ref, msa[i+1])
+                cleaned_ref, cleaned_seq = clean_frameshifts(aligned_ref, msa[i+1])
                 @test cleaned_seq == msa[i+1]
             end
         end
-        # 5.3 type stability
-        @testset "5.3 type stability" begin
+        # 5.3 type inferrence
+        @testset "5.3 type inferrence" begin
             @test typeof(@inferred msa_codon_align(ref, seqs)) == Vector{LongDNA{4}}
         end
 
@@ -135,7 +135,7 @@ using Random
         @testset "6.1 cleaning alignments which don't have frameshift mutations" begin
             A_no_frameshift = LongDNA{4}("---ATG---CCATTG---")
             B_no_frameshift = LongDNA{4}("TTTATGTCC---TTGTTT")
-            A_cleaned, B_cleaned = clean_alignment_readingframe(A_no_frameshift,B_no_frameshift)
+            A_cleaned, B_cleaned = clean_frameshifts(A_no_frameshift,B_no_frameshift)
             @test A_cleaned == A_no_frameshift
             @test B_cleaned == B_no_frameshift
         end
@@ -144,7 +144,7 @@ using Random
         @testset "6.2 clean single insertion and single deletion" begin
             A_frameshift = LongDNA{4}("ATG-CCA")
             B_frameshift = LongDNA{4}("ATGTCC-")
-            A_cleaned, B_cleaned = clean_alignment_readingframe(A_frameshift,B_frameshift)
+            A_cleaned, B_cleaned = clean_frameshifts(A_frameshift,B_frameshift)
             @test A_cleaned == LongDNA{4}("ATGCCA")
             @test B_cleaned == LongDNA{4}("ATGCCN")
         end
@@ -153,7 +153,7 @@ using Random
         @testset "6.3 insertion of length 4 and deletion of length 4 which starts on codon boundary" begin
             A_frameshift = LongDNA{4}("ATG----CCATTG")
             B_frameshift = LongDNA{4}("ATGTTTT----TG")
-            A_cleaned, B_cleaned = clean_alignment_readingframe(A_frameshift,B_frameshift)
+            A_cleaned, B_cleaned = clean_frameshifts(A_frameshift,B_frameshift)
             @test A_cleaned == LongDNA{4}("ATG---CCATTG")
             @test B_cleaned == LongDNA{4}("ATGTTT---NTG")
         end
@@ -163,16 +163,16 @@ using Random
         @testset "6.4 insertions and deletions which cross codon boundaries and doesn't start on a boundary" begin
             A_frameshift = LongDNA{4}("ATGA-----CCATT")
             B_frameshift = LongDNA{4}("ATGATTTTT---TG")
-            A_cleaned, B_cleaned = clean_alignment_readingframe(A_frameshift,B_frameshift)
+            A_cleaned, B_cleaned = clean_frameshifts(A_frameshift,B_frameshift)
             @test A_cleaned == LongDNA{4}("ATGACCATT")
             @test B_cleaned == LongDNA{4}("ATGANNNTG")
         end
         
-        # 6.5 type stability
-        @testset "6.5 type stability" begin
+        # 6.5 type inferrence
+        @testset "6.5 type inferrence" begin
             A_frameshift = LongDNA{4}("ATGA-----CCATT")
             B_frameshift = LongDNA{4}("ATGATTTTT---TG")
-            @test typeof(@inferred clean_alignment_readingframe(A_frameshift,B_frameshift)) == Tuple{LongDNA{4},LongDNA{4}}
+            @test typeof(@inferred clean_frameshifts(A_frameshift,B_frameshift)) == Tuple{LongDNA{4},LongDNA{4}}
         end
     end
 end
