@@ -1,6 +1,6 @@
 """
 ```julia
-ScoreScheme(; match_score=0.0, mismatch_score=0.5,extension_score=0.1,edge_ext_begin=true,edge_ext_end=true,kmerlength=21)
+ScoringScheme(; match_score=0.0, mismatch_score=0.5,extension_score=0.1,edge_ext_begin=true,edge_ext_end=true,kmerlength=21)
 ```
 
 A struct for storing scoring parameters used for sequence alignment. Uses a keyword constructor. 
@@ -16,16 +16,16 @@ A struct for storing scoring parameters used for sequence alignment. Uses a keyw
 - `kmerlength::Int64`: Length of k-mers used for seeding alignments (if applicable). Ignored if no seeding is used.
 
 # Description
-`ScoreScheme` defines how matches, mismatches, and gaps are scored during nucleotide-level sequence alignment. 
+`ScoringScheme` defines how matches, mismatches, and gaps are scored during nucleotide-level sequence alignment. 
 
 This struct is typically passed to functions like `seed_chain_align` or `msa_codon_align`.
 
 # example
 ```julia
-score_params = ScoreScheme(extension_score = 0.3, mismatch_score = 0.7) # (everything else will be keept at default values)
+score_params = ScoringScheme(extension_score = 0.3, mismatch_score = 0.7) # (everything else will be keept at default values)
 ```
 """
-struct ScoreScheme
+struct ScoringScheme
 	# 1=A, 2=C, 3=G, 4=T for both row and column indicies
 	nucleotide_score_matrix::Matrix{Float64}
 	# extending gap penalty
@@ -33,16 +33,16 @@ struct ScoreScheme
 	# start and end extension bools 
 	edge_ext_begin::Bool
 	edge_ext_end::Bool
-	# (opt arg) if codon_matching_enabled in aligner function
-	# TODO add opt arg for codon scoring matrix
+	# (opt arg) if match_codons in aligner function
+	# TODO replace with codon scoring matrix
 	codon_match_bonus::Float64
 	# (opt arg) if seeding
 	kmerlength::Int64
 	
 end
 
-# ScoreScheme construction wrapper
-function ScoreScheme(; nucleotide_score_matrix::Union{Matrix{Float64},Nothing}=nothing, match_score::Float64 = 0.0, mismatch_score::Float64=0.7,
+# ScoringScheme construction wrapper
+function ScoringScheme(; nucleotide_score_matrix::Union{Matrix{Float64},Nothing}=nothing, match_score::Float64 = 0.0, mismatch_score::Float64=0.7,
 		extension_score::Float64=0.4, edge_ext_begin=true::Bool, edge_ext_end=true::Bool, 
 		codon_match_bonus::Float64=-2.0, kmerlength::Int64=18)
 
@@ -51,15 +51,15 @@ function ScoreScheme(; nucleotide_score_matrix::Union{Matrix{Float64},Nothing}=n
 		nucleotide_score_matrix = simple_match_penalty_matrix(match_score, mismatch_score)
 	end
 	# call actual constructor
-	return ScoreScheme(nucleotide_score_matrix,extension_score,
+	return ScoringScheme(nucleotide_score_matrix,extension_score,
 		edge_ext_begin,edge_ext_end,
 		codon_match_bonus,kmerlength
-	)
+	)	
 end
 
 import Base: show
-function show(io::IO, s::ScoreScheme)
-	print(io, "ScoreScheme(",
+function show(io::IO, s::ScoringScheme)
+	print(io, "ScoringScheme(",
 			  "match=$(s.match_score), ",
 			  "mismatch=$(s.mismatch_score), ",
 			  "extension=$(s.extension_score), ",
@@ -72,10 +72,10 @@ end
 """
     std_codon_scoring()
 
-Return a standard codon-aware `ScoreScheme` for alignment.
+Return a standard codon-aware `ScoringScheme` for alignment.
 
 # Returns
-- `ScoreScheme`: Default scoring parameters for codon alignment.
+- `ScoringScheme`: Default scoring parameters for codon alignment.
 
 # Parameters
 - Match score: `0.0`
@@ -84,7 +84,7 @@ Return a standard codon-aware `ScoreScheme` for alignment.
 - Allow extension at sequence ends: `true` (both ends)
 - K-mer length for seeding: `18`
 
-Use this as a default `ScoreScheme` for codon-preserving alignments.
+Use this as a default `ScoringScheme` for codon-preserving alignments.
 """
 function std_scoring()
 	# params for nucleotide_score_matrix
@@ -95,12 +95,12 @@ function std_scoring()
 	# start and end extension bools
 	edge_ext_begin = true
 	edge_ext_end = true
-	# (opt arg) if codon_matching_enabled in aligner function
+	# (opt arg) if match_codons in aligner function
 	codon_match_bonus = -2.0
 	# (opt arg) if seeding
 	kmerlength = 18
 
-	return ScoreScheme(match_score=match_score,
+	return ScoringScheme(match_score=match_score,
 					   mismatch_score=mismatch_score,
 					   extension_score=extension_score,
 					   edge_ext_begin=edge_ext_begin,

@@ -1,40 +1,40 @@
 """ 
-    nw_align(A::LongDNA{4},B::LongDNA{4},moveset::Moveset,scoreScheme::ScoreScheme)
+    nw_align(A::LongDNA{4},B::LongDNA{4},moveset::Moveset,ScoringScheme::ScoringScheme)
     
     Takes two ungapped LongDNA{4} sequences and computes an optimal pairwise alignment 
-    with respect to the moveset and the scoreScheme. 
+    with respect to the moveset and the ScoringScheme. 
 
 """
 # needleman_wunsch wrapper - default noisy i.e no reference sequence
-function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoreScheme=std_scoring())
+function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoringScheme=std_scoring())
     # force no clean_up
-    clean_up_enabled=false
+    do_clean_frameshifts=false
     verbose=false
-    # force no codon_matching_enabled
-    codon_matching_enabled=false
+    # force no match_codons
+    match_codons=false
     # unpack arguments and call the internal alignment function
     nw_align(
         A, B, moveset.match_moves, moveset.vert_moves, moveset.hor_moves, 
         scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_match_bonus,
-        scoring.edge_ext_begin, scoring.edge_ext_end, codon_matching_enabled, clean_up_enabled, verbose
+        scoring.edge_ext_begin, scoring.edge_ext_end, match_codons, do_clean_frameshifts, verbose
     )
 end
 
 # needleman_wunsch wrapper - default reference informed
-function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_codon_moveset(), scoring::ScoreScheme=std_scoring(), 
-    clean_up_enabled=false::Bool, verbose=false::Bool, codon_matching_enabled=true::Bool)
+function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(), 
+    do_clean_frameshifts=false::Bool, verbose=false::Bool, match_codons=true::Bool)
     # unpack arguments and call the internal alignment function
     nw_align(
         ref, query, moveset.match_moves, moveset.vert_moves, moveset.hor_moves, 
         scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_match_bonus,
-        scoring.edge_ext_begin, scoring.edge_ext_end, codon_matching_enabled, clean_up_enabled, verbose
+        scoring.edge_ext_begin, scoring.edge_ext_end, match_codons, do_clean_frameshifts, verbose
     )
 end
 
 # Needleman Wunsch alignment with affine scoring
 function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, 
     match_score_matrix::Matrix{Float64}, extension_score::Float64, codon_match_bonus::Float64 =-2.0, edge_extension_begin=false::Bool, 
-    edge_extension_end=false::Bool, codon_matching_enabled=false::Bool, clean_up_enabled=false::Bool, verbose=false::Bool)
+    edge_extension_end=false::Bool, match_codons=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool)
     
     # throw exception if invalid alphabet in LongDNA{4}
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
@@ -82,7 +82,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::Vector{Move}, vgap_
             left_sequence_pos = row_index-row_offset
 
             # reward for matching codons if enabled
-            if codon_matching_enabled && (top_sequence_pos) % 3 == 0
+            if match_codons && (top_sequence_pos) % 3 == 0
                 # performance optimized translation
                 ref_AA = fast_translate((A2[column_index-3],A2[column_index-2],A2[column_index-1]))
                 seq_AA = fast_translate((B2[row_index-3],B2[row_index-2],B2[row_index-1]))
@@ -233,7 +233,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::Vector{Move}, vgap_
             match_Found = false
             if !must_move_hor && !must_move_ver
                 # reward for matching codons if enabled
-                if codon_matching_enabled && (top_sequence_pos) % 3 == 0
+                if match_codons && (top_sequence_pos) % 3 == 0
                     mismatch_sum = sum(t -> match_score_matrix[toInt(A2[x - t]), toInt(B2[y - t])], 1 : 3)
                     ref_AA = fast_translate((A2[x-3],A2[x-2],A2[x-1]))
                     seq_AA = fast_translate((B2[y-3],B2[y-2],B2[y-1]))
@@ -351,7 +351,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::Vector{Move}, vgap_
     aligned_A = reverse(res_A)
     aligned_B = reverse(res_B)
     # clean_up single indels if enabled
-    if clean_up_enabled
+    if do_clean_frameshifts
         aligned_A, aligned_B = clean_frameshifts(aligned_A, aligned_B, verbose=verbose)
     end
     # return alignment

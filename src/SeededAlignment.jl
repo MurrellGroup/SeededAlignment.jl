@@ -7,7 +7,7 @@ using FASTX
 include("utils/fasta_io.jl")
 # structs for alignment flexibility
 include("alignmentOptions/moveset.jl")
-include("alignmentOptions/scoreScheme.jl")
+include("alignmentOptions/scoring_scheme.jl")
 # stats structs for one of the seeding Methods
 include("seq_alignment/custom_2D_stats.jl")
 # clean_up functionality
@@ -22,6 +22,5 @@ export
     # Remove frameshift mutations/noise from a Pairwise Codon Alignment
     clean_frameshifts,
     # Alignment Options types
-    Moveset, ScoreScheme, Move
-    
+    Moveset, ScoringScheme, Move
 end
