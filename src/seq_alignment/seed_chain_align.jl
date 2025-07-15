@@ -24,9 +24,8 @@ ScoringScheme = std_scoring()
 
 alignment = seed_chain_align(A, B, moveset, ScoringScheme)
 ```
-"""
-
 # seed_chain_align wrapper - default noisy i.e no reference sequence
+"""
 function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoringScheme=std_scoring())
     # force no clean_up
     do_clean_frameshifts=false

@@ -109,3 +109,12 @@ function std_scoring()
 					   kmerlength=kmerlength
 	)
 end
+
+# matrix constructor helper method
+function simple_match_penalty_matrix(match_score, mismatch_score, n=4)
+    m = fill(mismatch_score, n, n)
+    for i in 1:n
+        m[i,i] = match_score
+    end
+    return m
+end

@@ -4,47 +4,43 @@ CurrentModule = SeededAlignment
 
 # API Reference
 
-This section provides detailed documentation for all public types and functions in `SeededAlignment.jl`.
+This section provides detailed documentation for all exported types and functions in `SeededAlignment.jl`.
 
-## Core Types
+## Core Methods
 
-These types define the fundamental structures used in the alignment algorithms:
-
-- [`Move`](@ref)
-- [`MoveSet`](@ref)
-- [`ScoreScheme`](@ref)
-- `LongDNA{4}`
-
-## Alignment Functions
-
-These functions perform the actual sequence alignment operations:
-
-- [`seed_chain_align`](@ref)
-- [`msa_codon_align`](@ref)
-- [`clean_alignment_readingframe`](@ref)
+- **`seed_chain_align`** 
+- **`msa_codon_align`** 
+- [`clean_frameshifts`](@ref)
 - [`nw_align`](@ref)
 
 ## Utilities
 
-Helper functions for working with alignment data:
+methods for reading and writing of sequence data in FASTA format.
 
 - [`read_fasta`](@ref)
 - [`write_fasta`](@ref)
 
+## Core Types
+
+- `Move`
+- `Moveset`
+- `ScoringScheme`
+- `LongDNA{4}`
+
 ## Standard Parameters
 
-Pre-configured settings for common alignment scenarios:
+- `std_scoring`
+- `std_codon_moveset`
+- `std_noisy_moveset`
 
-- [`std_codon_scoring`](@ref)
-- [`std_codon_moveset`](@ref)
-- `pairwise_noisy_moveset`
-
-## Function Index
+## Index
 
 A complete alphabetical listing of all documented functions.
 
 ```@index
 ```
+
+## Index Docstrings
 
 ```@autodocs
 Modules = [SeededAlignment]

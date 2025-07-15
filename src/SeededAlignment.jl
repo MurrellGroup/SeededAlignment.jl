@@ -1,9 +1,12 @@
 module SeededAlignment
 
-using BioSequences
-using FASTX
 
-# utils
+using FASTX
+# export dna sequence datatype
+using BioSequences
+using BioSequences: LongDNA
+export LongDNA
+# exports utilities
 include("utils/fasta_io.jl")
 # structs for alignment flexibility
 include("alignmentOptions/moveset.jl")
@@ -22,5 +25,7 @@ export
     # Remove frameshift mutations/noise from a Pairwise Codon Alignment
     clean_frameshifts,
     # Alignment Options types
-    Moveset, ScoringScheme, Move
+    Moveset, ScoringScheme, Move,
+    # utilities
+    read_fasta, write_fasta
 end

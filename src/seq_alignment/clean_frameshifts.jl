@@ -1,13 +1,22 @@
 
 """
-    clean_alignment_readingframe(aligned_ref::LongDNA{4},aligned_seq::LongDNA{4};verbose::Bool=false)
+    clean_frameshifts(aligned_ref::LongDNA{4},aligned_seq::LongDNA{4}; verbose::Bool=false)
 
-    Takes a pairwise alignment of a reference (with known reading frame) and a sequence, and removes single indels which
-    don't respect the reference's reading frame.
+Takes a pairwise alignment of a reference (with known reading frame) and a sequence, and removes frameshift mutations 
+which don't respect the reference's reading frame. This is done by removing insertions from the alignment or inserting 
+ambigious nucleotides into deletions.
 
-    # NOTE We assume the readingFrame is 0 mod 3 with sequences 0 indexed
+# Examples:
+1. insertion
+ref: ATG-AACGTA  -> cleaned_ref: ATGAACGTA 
+seq: ATGTAACGTA  -> cleaned_seq: ATGAACGTA
+
+2. deletion
+ref: ATGAACGTA  -> cleaned_ref: ATGAACGTA
+seq: ATG-ACGTA  -> cleaned_seq: ATGNACGTA
+
+**NOTE** We always assume the readingFrame is 1
 """
-# TODO add verbose_clean_up to aligners
 function clean_frameshifts(aligned_ref::LongDNA{4},aligned_seq::LongDNA{4};verbose::Bool=false)
     # exception handling
     length(ungap(aligned_ref)) % 3 == 0 || throw(ArgumentError("The original reference sequence (ungap(aligned_ref)) must have length divisible by 3")) 

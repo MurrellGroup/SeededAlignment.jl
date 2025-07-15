@@ -47,7 +47,7 @@ Pkg.add(url="https://github.com/MurrellGroup/SeededAlignment.jl")
 
 Here we provide quick showcase of the following methods:
 
-- `seed_chain_align` - with and without refernce
+- `seed_chain_align` - with and without reference
 - `clean_frameshifts` - given pairwise alignment with reference. 
 - `msa_codon_align` - produces a visual multiple sequence alignment pairwise relative to a reference
 

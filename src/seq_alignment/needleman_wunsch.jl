@@ -1,11 +1,13 @@
 """ 
-    nw_align(A::LongDNA{4},B::LongDNA{4},moveset::Moveset,ScoringScheme::ScoringScheme)
     
-    Takes two ungapped LongDNA{4} sequences and computes an optimal pairwise alignment 
-    with respect to the moveset and the ScoringScheme. 
+    nw_align(A::LongDNA{4},B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoringScheme=std_scoring()
+    
+Needleman_Wunsch wrapper - no reference, i.e. makes no assumptions about the two sequences. 
+
+Computes an optimal global pairwise alignment of two ungapped `LongDNA{4}` sequence  
+with respect to the `Moveset` and the `ScoringScheme`. 
 
 """
-# needleman_wunsch wrapper - default noisy i.e no reference sequence
 function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoringScheme=std_scoring())
     # force no clean_up
     do_clean_frameshifts=false
@@ -20,7 +22,18 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moves
     )
 end
 
-# needleman_wunsch wrapper - default reference informed
+""" 
+    
+    nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(),
+        do_clean_frameshifts=false::Bool, verbose=false::Bool, match_codons=true::Bool)
+
+Needleman_Wunsch wrapper - reference informed, i.e. assumes one of the sequence has intact reading frame. 
+
+Optimally aligns a `query` sequence to a `ref` sequence using a codon-aware `Moveset` and `ScoringScheme`. In particular ... 
+... 
+
+**NOTE** We always assume the readingFrame is 1
+"""
 function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(), 
     do_clean_frameshifts=false::Bool, verbose=false::Bool, match_codons=true::Bool)
     # unpack arguments and call the internal alignment function
@@ -31,7 +44,7 @@ function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_cod
     )
 end
 
-# Needleman Wunsch alignment with affine scoring
+# Needleman Wunsch alignment with affine scoring (internal function)
 function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, 
     match_score_matrix::Matrix{Float64}, extension_score::Float64, codon_match_bonus::Float64 =-2.0, edge_extension_begin=false::Bool, 
     edge_extension_end=false::Bool, match_codons=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool)
@@ -362,14 +375,6 @@ end
 
 # Convert NucleicAcid to integer A -> 1, C -> 2, G -> 3, T -> 4
 toInt(x::NucleicAcid) = trailing_zeros(reinterpret(UInt8, x)) + 1
-# default match_score_matrix
-function simple_match_penalty_matrix(match_score, mismatch_score, n=4)
-    m = fill(mismatch_score, n, n)
-    for i in 1:n
-        m[i,i] = match_score
-    end
-    return m
-end
 
 const codon_table::Vector{AminoAcid} = AminoAcid[
     # AAA AAC AAG AAT
@@ -415,14 +420,14 @@ function fast_translate(dna_seq::NTuple{3, DNA})
     return codon_table[hash_index]
 end
 
-# TODO depricated
+# TODO depricate
 function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score::Float64, mismatch_score::Float64, 
                 match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move})
 
     nw_align(A, B, simple_match_penalty_matrix(match_score, mismatch_score), match_moves, vgap_moves, hgap_moves) 
 end
 
-# TODO depricated
+# TODO depricate
 #Needleman Wunsch alignment without affine scoring
 function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float64, 2},
                 match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move})

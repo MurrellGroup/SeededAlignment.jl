@@ -19,9 +19,6 @@ makedocs(;
     ),
     pages = [
         "Home" => "index.md",
-        #"Tutorial" => "tutorial.md"
-        #"Customizing Alignments" => "customizing alignments.md",
-        "Types" => "types.md",
         "API Reference" => "api.md",
     ],
     doctest = false,
