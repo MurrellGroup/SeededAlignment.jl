@@ -5,6 +5,17 @@
 
 SeededAlignment.jl aims to provide a user-friendly interface for pairwise sequence alignment that supports user-defined alignment operations, flexible scoring and is optimized for performance. In particular, it can be used to produce frameshift-free codon-alignments (relative to known refence) and clean previously constructed alignments of frameshift mutations, provided an aligned reference sequence.
 
+## Installation
+
+You can install this package using Julia's package manager:
+
+```julia
+using Pkg
+Pkg.add(url="https://github.com/MurrellGroup/SeededAlignment.jl")
+```
+
+---
+
 ## Core Methods
 
 1. **`seed_chain_align`** - fast (in the sense of subquadratic TC) pairwise alignment method which uses heurstically guided seeding and subsequently chains them together.  
@@ -32,17 +43,6 @@ SeededAlignment.jl aims to provide a user-friendly interface for pairwise sequen
 
 ---
 
-## Installation
-
-You can install this package using Julia's package manager:
-
-```julia
-using Pkg
-Pkg.add(url="https://github.com/MurrellGroup/SeededAlignment.jl")
-```
-
----
-
 ## Examples:
 
 Here we provide quick showcase of the following methods:
@@ -57,15 +57,15 @@ seed_chain_align is provided with two wrapper methods for two different uses. Th
 ```julia
 seed_chain_align(seq1, seq2)
 ```
-and makes no assumptions about the two sequences. On the other hand if we have a reference sequence with intact readingframe we have to specify this to the method. This is done by calling the other wrapper which looks like
+and makes no assumptions about the two sequences. On the other hand if we have a reference sequence with intact reading frame we have to specify this to the method. This is done by calling the other wrapper which looks like
 ```julia
 seed_chain_align(ref=ref_seq, query=non_ref_seq)
 ```
-the main difference between the results of two methods is that the latter prefers codon indels relative to reference readingframe over indels which shift the readingframe.
+the main difference between the results of two methods is that the latter prefers codon indels relative to reference reading frame over indels which shift the reading frame.
 
 **Note:** that the nw_align wrappers are the same as seed_chain_align. Hence in all of the following examples seed_chain_align can be replaced with nw_align without any issues. 
 
-If we want to align two sequnces without assuming intact readingframe we simply supply them as positional arguments. 
+If we want to align two sequnces without assuming intact reading frame we simply supply them as positional arguments. 
 
 ```julia
 using SeededAlignment
@@ -77,7 +77,7 @@ seq2 = dna_seqs[2]
 # align heurisitically where no sequences is treated as reference
 seq1_aligned, seq2_aligned = seed_chain_align(seq1,seq2)
 ```
-On the other hand if we have a reference sequence with intact readingframe we have to specify this to the method
+On the other hand if we have a reference sequence with intact reading frame we have to specify this to the method
 
 ```julia
 using SeededAlignment
@@ -121,14 +121,14 @@ cleaned_seq1, cleaned_seq2 = clean_frameshifts(seq1_aligned, seq2_aligned, verbo
 
 Lastly, we show how `msa_codon_align` can be used to visual frameshift-free multiple sequence alignment based on pairwise alignments relative to a reference. Note that some edits to the sequences might be made since we clean framshift mutations in each pairwise alignment. 
 
-**NOTE:** A refernce sequence with intact readingframe is a required argument for this method to work.
+**NOTE:** A refernce sequence with intact reading frame is a required argument for this method to work.
 
 ```julia
 using SeededAlignment
 
 # read in dna_sequences
 seq_names, dna_seqs = read_fasta("example.fasta")
-# choose a reference sequence with intact readingframe
+# choose a reference sequence with intact reading frame
 ref_seq = dna_seqs[1]
 # extract the query sequences
 query_seqs = dna_seqs[2:end]
