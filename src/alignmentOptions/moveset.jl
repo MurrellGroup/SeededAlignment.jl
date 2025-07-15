@@ -84,19 +84,19 @@ A `Moveset` groups the allowable `Move`s into categories used during dynamic pro
 Used by alignment algorithms such as `seed_chain_align` and  `msa_codon_align` to control the scoring and allowed operations during alignment.
 """
 
-struct Moveset # TODO swap to tuples
-    match_moves::Vector{Move}
-    vert_moves::Vector{Move}
-    hor_moves::Vector{Move}
-end
+#struct Moveset # TODO swap to tuples
+#    match_moves::Vector{Move}
+##    vert_moves::Vector{Move}
+#    hor_moves::Vector{Move}
+#end
 
-"""
-struct Moveset{A,B,C} # stack allocated...
-    match_moves::NTuple{A,Move}
-    vert_moves::NTuple{B,Move}
-    hor_moves::NTuple{C,Move}
+
+# stack allocated
+struct Moveset{X,Y,Z}
+    match_moves::NTuple{X,Move}
+    vert_moves::NTuple{Y,Move}
+    hor_moves::NTuple{Z,Move}
 end
-"""
 
 
 Moveset(; match_moves, vert_moves, hor_moves) = Moveset(match_moves, vert_moves, hor_moves)
@@ -128,9 +128,9 @@ Return a standard codon-aware `Moveset` for sequence alignment.
 Use this as a default `Moveset` for codon-preserving alignments.
 """
 function std_codon_moveset()
-    match_moves = [Move(1,.0)]
-    vert_moves = [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true)]
-    hor_moves =  [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true)]
+    match_moves = (Move(1,.0),)
+    vert_moves = (Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true))
+    hor_moves =  (Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true))
     return Moveset(match_moves,vert_moves,hor_moves)
 end
 """
@@ -138,8 +138,8 @@ end
 
 """
 function std_noisy_moveset()
-    match_moves = [Move(1,.0)]
-    vert_moves = [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,1,0, true)]
-    hor_moves =  [Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,1,0, true)]
+    match_moves = (Move(1,.0),)
+    vert_moves = (Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,1,0, true))
+    hor_moves =  (Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,1,0, true))
     return Moveset(match_moves,vert_moves,hor_moves)
 end

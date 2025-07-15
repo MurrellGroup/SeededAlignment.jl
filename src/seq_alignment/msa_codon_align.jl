@@ -1,31 +1,8 @@
 """
-    msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(), match_codons=true::Bool, use_seeded=true::Bool)
+    msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(), 
+        match_codons=true::Bool, use_seeded=true::Bool)
 
-Produces a fast codon aligment with consistent readingFrame. 
-
-# Arguments
-- `ref::LongDNA{4}`: The reference DNA sequence, assumed to have an readingFrame which starts at its first nucleotide.
-- `seqs::Vector{LongDNA{4}}`: A vector of DNA sequences to align against the reference.
-- `moveset::Moveset`: Defines the allowable alignment operations (e.g. match nucleotide, single indel, readingFrame respecting triple indel). Assumes moveset is choosen so some moves respect the readingFrame.
-- `score_params::ScoringScheme`: Scoring parameters for codon-aware alignment, including match/mismatch and gap penalties.
-    
-# Returns
-- `Vector{LongDNA{4}}`: A vector of aligned sequences (including the reference), with codon-aware gaps that preserve reading frame consistency.
-
-# Description
-Produces a fast multiple codon alignment based on a reference with known readingFrame, a moveset and a ScoringScheme. 
-This is done by computing a pairwise alignment with respect to the reference for each sequence and then cleaning up single indel noise.
-
-# Example
-```julia
-ref = LongDNA{4}("ATGACGTGA")  # Reference with known reading frame
-seqs = [LongDNA{4}("ATGTCGTGA"), LongDNA{4}("ATGACGAGA")]
-moveset = std_codon_moveset()
-score_params = std_scoring()
-
-alignment = msa_codon_align(ref, seqs, moveset, score_params)
-```
-NOTE: The sequences (ungapped) might not be preserved by the alignment by the cleanup step. Some nucleotides might be inserted or removed.  
+emm idk...
 """
 function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(), match_codons=true::Bool, use_seeded=true::Bool)
     cleaned_codon_alignment = Vector{LongDNA{4}}(undef, length(seqs)+1)

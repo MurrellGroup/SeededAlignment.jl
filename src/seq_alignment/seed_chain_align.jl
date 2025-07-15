@@ -1,30 +1,10 @@
 """
-    seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::Moveset, ScoringScheme::ScoringScheme)
-Perform pairwise alignment between two DNA sequences using a seeding strategy.
+    seed_chain_align(A::LongDNA{4},B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoringScheme=std_scoring()
+    
+seed_chain_align wrapper - no reference, i.e. makes no assumptions about the two sequences. 
 
-# Arguments
-- `A::LongDNA{4}`: The first DNA sequence to align.
-- `B::LongDNA{4}`: The second DNA sequence to align.
-- `moveset::Moveset`: Defines allowed alignment moves (e.g., match, mismatch, gap).
-- `ScoringScheme::ScoringScheme`: Scoring scheme for e.g. matches, mismatches, and gaps.
-
-# Returns
-- `Vector{LongDNA{4}}`: A vector the two aligned sequences.
-
-# Description
-This function performs a fast (sub-quadratic) pairwise alignment using seeding and chaining. It identifies high-scoring seed matches between `A` and `B`, chains them to build a candidate alignment skeleton, and fills gaps between seeds using dynamic programming guided by `moveset` and `ScoringScheme`.
-
-
-# Example
-```julia
-A = LongDNA{4}("ACGTACGT")
-B = LongDNA{4}("ACGTTGCA")
-moveset = std_codon_moveset()
-ScoringScheme = std_scoring()
-
-alignment = seed_chain_align(A, B, moveset, ScoringScheme)
-```
-# seed_chain_align wrapper - default noisy i.e no reference sequence
+Computes a heuristically guided global pairwise alignment of two ungapped `LongDNA{4}` sequence based on seeding. The seeds are then joined together 
+by doing a partial alignment with nw_align between seeds optimally with repect to the `Moveset` and `ScoringScheme`.
 """
 function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoringScheme=std_scoring())
     # force no clean_up
@@ -41,7 +21,18 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noi
 
 end
 
-# seed_chain_align wrapper - default reference informed
+""" 
+    
+    seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(),
+        do_clean_frameshifts=false::Bool, verbose=false::Bool, match_codons=true::Bool)
+
+seed_chain_align wrapper - reference informed, i.e. assumes one of the sequence has intact reading frame. 
+
+Heuristically aligns a `query` sequence to a `ref` sequence based on seeding. The seeds are then joined together 
+by doing a partial alignment with nw_align between seeds optimally with repect to a codon-aware `Moveset` and `ScoringScheme`.
+
+**NOTE** We always assume the readingFrame is 1
+"""
 function seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(), 
     match_codons=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool)
     # unpack arguments and call the internal alignment function
@@ -49,18 +40,6 @@ function seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset
         ref, query, moveset.match_moves, moveset.vert_moves, moveset.hor_moves,
         scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_match_bonus,
         scoring.kmerlength, match_codons, do_clean_frameshifts, verbose
-    )
-end
-
-# internal wrapper to create score matrix and call alignment function
-function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_score::Float64, mismatch_score::Float64, 
-        match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score::Float64, kmerLength::Int64 = 12,
-        do_clean_frameshifts=false::Bool, match_codons=false::Bool, codon_match_bonus::Float64 = -2.0)
-    
-    # call the proper alignment function
-    seed_chain_align(
-           A, B, simple_match_penalty_matrix(match_score, mismatch_score), match_moves,
-           vgap_moves, hgap_moves, extension_score, kmerLength, do_clean_frameshifts, match_codons, codon_match_bonus
     )
 end
 
@@ -104,11 +83,12 @@ function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmerLength)
     return kmerMatches
 end
 
-function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::Matrix{Float64}, match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, extension_score::Float64, k::Int64)
+function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::Matrix{Float64}, 
+    match_moves::NTuple{X,Move}, vgap_moves::NTuple{Y,Move}, hgap_moves::NTuple{Z,Move}, extension_score::Float64, k::Int64) where {X, Y, Z}
     
     # Produce constants used for estimating scores without A and B
     min_match_score = minimum(t -> match_score_matrix[t, t], 1 : 4) + minimum(move -> move.score / move.step, match_moves)
-    gap_score_estimate = minimum(move -> move.score / move.step, vcat(vgap_moves, hgap_moves))
+    gap_score_estimate = minimum(move -> move.score / move.step, (vgap_moves..., hgap_moves...))
     if gap_score_estimate > extension_score >= 0
         gap_score_estimate = (gap_score_estimate + 2 * extension_score) / 3 # approx_gap_score undefined, replaced with gap_score_estimate
     end
@@ -216,9 +196,9 @@ function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::M
     return kmerPath
 end
 
-function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, 
+function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::NTuple{X,Move}, vgap_moves::NTuple{Y,Move}, hgap_moves::NTuple{Z,Move}, 
     match_score_matrix::Matrix{Float64}, extension_score::Float64 = -1.0, codon_match_bonus::Float64 = -2.0, kmerLength::Int64 = 12,
-    match_codons=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool)
+    match_codons=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y, Z}
 
     # throw exception if invalid alphabet in LongDNA{4}
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
@@ -294,7 +274,7 @@ struct Endpoint
     isBeginning::Bool
 end
 
-#Kmer selection variant algorithm (unused currently)
+#Kmer selection variant algorithm (unused currently) will be compared in benchmark
 function select_max_correlation_kmer_path(kmerMatches)
 
     # Initialize

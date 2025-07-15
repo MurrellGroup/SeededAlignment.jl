@@ -29,9 +29,9 @@ using Random
             score_params_on = ScoringScheme(match_score=0.0, mismatch_score=0.3, extension_score=0.4, edge_ext_begin=true,edge_ext_end=true)
             score_params_off = ScoringScheme(match_score=0.0, mismatch_score=0.3, extension_score=0.4, edge_ext_begin=false,edge_ext_end=false)
             move_set = Moveset(
-                match_moves = [Move(1, 0.0, 1, 0, 1, 0, false)],
-                hor_moves = [Move(3, 30, 1, 0, 1, 0, true)],
-                vert_moves = [Move(3, 30, 1, 0, 1, 0, true)]
+                match_moves = (Move(1, 0.0, 1, 0, 1, 0, false),),
+                hor_moves = (Move(3, 30, 1, 0, 1, 0, true),),
+                vert_moves = (Move(3, 30, 1, 0, 1, 0, true),)
             )
             
             # test start and end extension on

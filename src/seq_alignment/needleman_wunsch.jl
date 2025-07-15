@@ -29,8 +29,7 @@ end
 
 Needleman_Wunsch wrapper - reference informed, i.e. assumes one of the sequence has intact reading frame. 
 
-Optimally aligns a `query` sequence to a `ref` sequence using a codon-aware `Moveset` and `ScoringScheme`. In particular ... 
-... 
+Optimally aligns a `query` sequence to a `ref` sequence using a codon-aware `Moveset` and `ScoringScheme`.
 
 **NOTE** We always assume the readingFrame is 1
 """
@@ -45,14 +44,14 @@ function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_cod
 end
 
 # Needleman Wunsch alignment with affine scoring (internal function)
-function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move}, 
+function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::NTuple{X,Move}, vgap_moves::NTuple{Y,Move}, hgap_moves::NTuple{Z,Move}, 
     match_score_matrix::Matrix{Float64}, extension_score::Float64, codon_match_bonus::Float64 =-2.0, edge_extension_begin=false::Bool, 
-    edge_extension_end=false::Bool, match_codons=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool)
+    edge_extension_end=false::Bool, match_codons=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y, Z}
     
     # throw exception if invalid alphabet in LongDNA{4}
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), B) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
-    
+
     n, m = length(A), length(B)
     # Do non-affine NW
     if !(extension_score > 0) 
@@ -62,8 +61,8 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::Vector{Move}, vgap_
     end
 
     # Offset indicies to avoid bounds-checking
-    column_offset = maximum(k -> k.step, vcat(match_moves, hgap_moves)) + 1
-    row_offset = maximum(k -> k.step, vcat(match_moves, vgap_moves)) + 1
+    column_offset = maximum(k -> k.step, (match_moves..., hgap_moves...)) + 1
+    row_offset = maximum(k -> k.step, (match_moves..., vgap_moves...)) + 1
     column_boundary = n + column_offset
     row_boundary = m + row_offset
 
@@ -422,7 +421,7 @@ end
 
 # TODO depricate
 function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score::Float64, mismatch_score::Float64, 
-                match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move})
+                match_moves::Tuple{Move}, vgap_moves::Tuple{Move}, hgap_moves::Tuple{Move})
 
     nw_align(A, B, simple_match_penalty_matrix(match_score, mismatch_score), match_moves, vgap_moves, hgap_moves) 
 end
@@ -430,7 +429,7 @@ end
 # TODO depricate
 #Needleman Wunsch alignment without affine scoring
 function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_score_matrix::Array{Float64, 2},
-                match_moves::Vector{Move}, vgap_moves::Vector{Move}, hgap_moves::Vector{Move})
+                match_moves::Tuple{Move}, vgap_moves::Tuple{Move}, hgap_moves::Tuple{Move})
 
     n, m = length(A), length(B)
 
