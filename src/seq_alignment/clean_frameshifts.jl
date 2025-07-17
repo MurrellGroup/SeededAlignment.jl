@@ -17,7 +17,7 @@ seq: ATG-ACGTA  -> cleaned_seq: ATGNACGTA
 
 **NOTE** We always assume the readingFrame is 1
 """
-function clean_frameshifts(aligned_ref::LongDNA{4},aligned_seq::LongDNA{4};verbose::Bool=false)
+function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4};verbose::Bool=false)
     # exception handling
     length(ungap(aligned_ref)) % 3 == 0 || throw(ArgumentError("The original reference sequence (ungap(aligned_ref)) must have length divisible by 3")) 
     !any((base_ref == '-') && (base_seq == '-') for (base_ref,base_seq) in zip(aligned_ref, aligned_seq)) || throw(ArgumentError("Both sequences have a gap at the same index, which therefore cannot be resolved")) 
@@ -66,11 +66,11 @@ function clean_frameshifts(aligned_ref::LongDNA{4},aligned_seq::LongDNA{4};verbo
             # deletions relative to reference are resolved by inserting ambigious nucleotide N
             elseif cur_codon_seq[j] == DNA_Gap
                 num_deletion_gaps_cleaned += 1
-                append!(cleaned_ref, cur_codon_ref[j:j])
+                push!(cleaned_ref, cur_codon_ref[j])
                 append!(cleaned_seq, LongDNA{4}("N")) # ambigious nucleotide
             else
-                append!(cleaned_ref, cur_codon_ref[j:j])
-                append!(cleaned_seq, cur_codon_seq[j:j])
+                push!(cleaned_ref, cur_codon_ref[j])
+                push!(cleaned_seq, cur_codon_seq[j])
             end
         end
 
@@ -86,12 +86,12 @@ function clean_frameshifts(aligned_ref::LongDNA{4},aligned_seq::LongDNA{4};verbo
             elseif aligned_seq[cur_pos+2+new_needed_insertAddon] == DNA_Gap
                 num_deletion_gaps_cleaned += 1
                 num_codon_bases_fixed += 1
-                append!(cleaned_ref, aligned_ref[cur_pos+2+new_needed_insertAddon:cur_pos+2+new_needed_insertAddon])
+                push!(cleaned_ref, aligned_ref[cur_pos+2+new_needed_insertAddon])
                 append!(cleaned_seq, LongDNA{4}("N")) # ambigious nucleotide
             else
                 num_codon_bases_fixed += 1
-                append!(cleaned_ref, aligned_ref[cur_pos+2+new_needed_insertAddon:cur_pos+2+new_needed_insertAddon])
-                append!(cleaned_seq, aligned_seq[cur_pos+2+new_needed_insertAddon:cur_pos+2+new_needed_insertAddon])
+                push!(cleaned_ref, aligned_ref[cur_pos+2+new_needed_insertAddon])
+                push!(cleaned_seq, aligned_seq[cur_pos+2+new_needed_insertAddon])
             end
         end
         last_alignment_index = cur_pos+2+new_needed_insertAddon
@@ -167,4 +167,43 @@ function clean_frameshifts(aligned_ref::LongDNA{4},aligned_seq::LongDNA{4};verbo
         end
     end
     return cleaned_ref, cleaned_seq
+end
+"""
+clean a multiple sequence alignment provided one of the sequence is a reference sequence
+"""
+function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seqs::Vector{LongDNA{4}})
+    # exception handling
+    length(ungap(aligned_ref)) % 3 == 0 || throw(ArgumentError("Invalid input:\nThe original reference sequence (ungap(aligned_ref)) must have length divisible by 3"))
+    !any(length(aligned_ref) != length(seq) for seq in aligned_seqs) || throw(ArgumentError("Invalid input:\n Not all of the aligned sequences in given MSA have the same length!"))
+    # clean_up heuristic - clean pairwise and scaffold
+    N = length(aligned_seqs)
+    cleaned_refs = Vector{LongDNA{4}}(undef, N)
+    cleaned_seqs = Vector{LongDNA{4}}(undef, N)
+    for i in 1:N
+        # project msa to valid pairwise alignment by removing redundant gaps - i.e. gaps matched to gaps
+        stripped_aligned_ref, stripped_aligned_seq = strip_gap_only_cols(aligned_ref, aligned_seqs[i])
+        # then clean the new pairwise alignment
+        cleaned_ref, cleaned_seq = clean_frameshifts(stripped_aligned_ref, stripped_aligned_seq)
+        # save result
+        cleaned_refs[i] = cleaned_ref
+        cleaned_seqs[i] = cleaned_seq
+    end
+    # scaffold the cleaned pairwise alignments into new frameshift-free multiple sequence alignment
+    cleaned_msa = resolve_codon_insertions(cleaned_refs, cleaned_seqs)
+    return cleaned_msa
+end
+
+function strip_gap_only_cols(seq1::LongDNA{4},seq2::LongDNA{4})
+    new_seq1 = LongDNA{4}()
+    new_seq2 = LongDNA{4}()
+    # iterate through alignment
+    for i in 1:length(seq1)
+        if seq1[i] == DNA_Gap && seq2[i] == DNA_Gap
+            continue
+        else
+            push!(new_seq1,seq1[i])
+            push!(new_seq2,seq2[i])
+        end
+    end
+    return new_seq1, new_seq2
 end

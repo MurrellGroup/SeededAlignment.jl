@@ -4,12 +4,13 @@
 
 emm idk...
 """
-function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(), match_codons=true::Bool, use_seeded=true::Bool)
+function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(), 
+        match_codons=true::Bool, use_seeded=true::Bool)
     cleaned_codon_alignment = Vector{LongDNA{4}}(undef, length(seqs)+1)
     # perform pairwise seeded alignment for each sequence and clean indels which violate the reference readingFrame
     cleaned_refs, cleaned_seqs = align_all_to_reference(ref, seqs, moveset, scoring, use_seeded = use_seeded, match_codons = match_codons, do_clean_frameshifts=true)
     # resolve codon_insertion ambigiouity via left-stacking relative to reference
-    msa = resolve_codon_insertions(ref, cleaned_refs, cleaned_seqs)
+    msa = resolve_codon_insertions(cleaned_refs, cleaned_seqs)
     return msa
 end
 
@@ -17,10 +18,12 @@ end
     align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::Moveset, score_params::ScoringScheme; use_seeded::Bool=true)
 
     Returns a seeded alignment with respect to the reference for each sequence. 
-
+    
 """
 
-function align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::Moveset, score_params::ScoringScheme; use_seeded=true::Bool, match_codons=true::Bool,do_clean_frameshifts=true::Bool)
+function align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::Moveset, score_params::ScoringScheme; 
+        use_seeded=true::Bool, match_codons=true::Bool,do_clean_frameshifts=true::Bool)
+
     aligned_seqs = Vector{LongDNA{4}}(undef,length(seqs))
     aligned_refs = Vector{LongDNA{4}}(undef,length(seqs))
     # choose alignment method
@@ -31,10 +34,11 @@ function align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moves
     end
     # perform alignment for each sequence w.r.t. reference sequence
     for seqId in 1:length(seqs)
-        aligned_ref, aligned_seq = align(ref = ref, query = ungap(seqs[seqId]),moveset=moveset,scoring=score_params, match_codons=match_codons, do_clean_frameshifts=do_clean_frameshifts) 
+        aligned_ref, aligned_seq = seed_chain_align(ref = ref, query = ungap(seqs[seqId]), moveset=moveset, scoring=score_params, 
+            match_codons=match_codons, do_clean_frameshifts=do_clean_frameshifts) 
         # save entire alignment to clean up later
-        aligned_seqs[seqId] = copy(aligned_seq)
-        aligned_refs[seqId] = copy(aligned_ref)
+        aligned_seqs[seqId] = aligned_seq
+        aligned_refs[seqId] = aligned_ref
     end
     return aligned_refs, aligned_seqs
 end
@@ -82,7 +86,11 @@ function find_triplet_insertions_codonindex(aligned_ref::LongDNA{4})
 end
 
 # TODO implement the speedup version of this
-function resolve_codon_insertions(ref::LongDNA{4}, cleaned_refs::Vector{LongDNA{4}}, cleaned_seqs::Vector{LongDNA{4}})
+function resolve_codon_insertions(cleaned_refs::Vector{LongDNA{4}}, cleaned_seqs::Vector{LongDNA{4}})
+    # NOTE: we assume that 
+    ref = ungap(cleaned_refs[1])
+    # TODO test if slight differences between cleaned_refs might still work
+    #!any(ref != ungap(cleaned_refs[i]) for i in 2:length(cleaned_refs)) || throw(ArgumentError(""))
     # bookkeeping variables
     n_seqs = length(cleaned_seqs)
     ref_insert_addon = 0

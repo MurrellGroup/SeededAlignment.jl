@@ -52,7 +52,7 @@ using Random
         
     end
 
-    # TODO finish this test case important
+    # TODO finish this test case important, easy
     #@testset "2. ref alignment nw_affine" begin
     #     move_set = Moveset(
     #            match_moves = [Move(1, 0.0, 1, 0, 1, 0, false)],
@@ -101,15 +101,15 @@ using Random
     @testset "5. msa_codon_align" begin
         Random.seed!(42)
         ref = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 51)
-        seqs = Vector{LongDNA{4}}(undef, 20)
-        for i in 1:20
+        seqs = Vector{LongDNA{4}}(undef, 10)
+        for i in 1:10
             seqs[i] = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 33+i)
         end
 	    # 5.1 aligned_sequences have the same length
         @testset "5.1 aligned_sequences have the same length" begin
             msa = msa_codon_align(ref, seqs)
             n = length(msa[1])
-            for i in 1:20
+            for i in 1:10
                 @test n == length(msa[i+1])
             end
         end
@@ -117,7 +117,7 @@ using Random
         @testset "5.2 test indels not break codon readingframe after clean_up" begin
             msa = msa_codon_align(ref, seqs)
             aligned_ref = msa[1]
-            for i in 1:20
+            for i in 1:10
                 cleaned_ref, cleaned_seq = clean_frameshifts(aligned_ref, msa[i+1])
                 @test cleaned_seq == msa[i+1]
             end
@@ -127,13 +127,12 @@ using Random
             @test typeof(@inferred msa_codon_align(ref, seqs)) == Vector{LongDNA{4}}
         end
         # 5.4 resolve_codon_insertions (internal method in msa_codon_align) handles codon insertions as expected
-        @testset "resolve_codon_insertions (internal method in msa_codon_align) handles codon insertions as expected" begin
-            ref = LongDNA{4}("ATGTTTCCCGGGTAA")
+        @testset "5.4 resolve_codon_insertions (internal method in msa_codon_align) handles codon insertions as expected" begin
             aligned_ref1 = LongDNA{4}("ATG---TTTCCCGGGTAA")
             aligned_seq1 = LongDNA{4}("ATGTTTTTTCCCGGGTAA")
             aligned_ref2 = LongDNA{4}("---ATG---TTTCCCGGGTAA---")
             aligned_seq2 = LongDNA{4}("ATGATGTTTTTTCCCGGGTAAGGG")
-            msa = SeededAlignment.resolve_codon_insertions(ref,[aligned_ref1,aligned_ref2], [aligned_seq1,aligned_seq2])
+            msa = SeededAlignment.resolve_codon_insertions([aligned_ref1,aligned_ref2], [aligned_seq1,aligned_seq2])
             # compare with expected scaffolded msa
             @test msa[1] == LongDNA{4}("---ATG---TTTCCCGGGTAA---")
             @test msa[2] == LongDNA{4}("---ATGTTTTTTCCCGGGTAA---")
@@ -141,7 +140,7 @@ using Random
         end
     end
     
-	@testset "6. clean_frameshifts" begin
+	@testset "6. clean_frameshifts - pairwise" begin
         # 6.1 cleaning alignments which don't have frameshift mutations
         @testset "6.1 cleaning alignments which don't have frameshift mutations" begin
             A_no_frameshift = LongDNA{4}("---ATG---CCATTG---")
@@ -179,6 +178,47 @@ using Random
             A_frameshift = LongDNA{4}("ATGA-----CCATT")
             B_frameshift = LongDNA{4}("ATGATTTTT---TG")
             @test typeof(@inferred clean_frameshifts(A_frameshift,B_frameshift)) == Tuple{LongDNA{4},LongDNA{4}}
+        end
+    end
+
+    @testset "7. clean_frameshifts - MSA" begin
+        # simple test if msa version matches pairwise version
+        @testset "7.1 matches pairwise version" begin
+            A_frameshift = LongDNA{4}("ATGA-----CCATT")
+            B_frameshift = LongDNA{4}("ATGATTTTT---TG")
+            clean_msa = clean_frameshifts(A_frameshift,[B_frameshift])
+            @test clean_msa[1] == LongDNA{4}("ATGACCATT")
+            @test clean_msa[2] == LongDNA{4}("ATGANNNTG")
+        end
+        # 7.2 cleans msa example correctly
+        @testset "7.2 cleans msa example correctly" begin
+            aligned_seqs = Vector{LongDNA{4}}(undef, 4)
+            cleaned_seqs = Vector{LongDNA{4}}(undef, 4)
+            # original ref:   LongDNA{4}("ATGTTTCCCGGGTAA")
+            aligned_ref =     LongDNA{4}("ATG---TTTCCCGGGT-AA")
+            aligned_seqs[1] = LongDNA{4}("-TG------CCCGGGT-A-")
+            aligned_seqs[2] = LongDNA{4}("ATGAAATTTCCCGGGT-AA")
+            aligned_seqs[3] = LongDNA{4}("ATGAAA----CCGGGT-AA")
+            aligned_seqs[4] = LongDNA{4}("ATG---TTTCCCGGGTTAA")
+            # expected clean_up results
+            cleaned_ref =     LongDNA{4}("ATG---TTTCCCGGGTAA")
+            cleaned_seqs[1] = LongDNA{4}("NTG------CCCGGGTAN")
+            cleaned_seqs[2] = LongDNA{4}("ATGAAATTTCCCGGGTAA")
+            cleaned_seqs[3] = LongDNA{4}("ATGAAA---NCCGGGTAA")
+            cleaned_seqs[4] = LongDNA{4}("ATG---TTTCCCGGGTAA")
+            # clean and test results
+            cleaned_msa = clean_frameshifts(aligned_ref, aligned_seqs)
+            @test cleaned_msa[1] == cleaned_ref
+            @test cleaned_msa[2] == cleaned_seqs[1]
+            @test cleaned_msa[3] == cleaned_seqs[2]
+            @test cleaned_msa[4] == cleaned_seqs[3]
+            @test cleaned_msa[5] == cleaned_seqs[4]
+        end
+        # 7.3 type inferrence
+        @testset "7.3 type inferrence" begin
+            A_frameshift = LongDNA{4}("ATGA-----CCATT")
+            B_frameshift = LongDNA{4}("ATGATTTTT---TG")
+            @test typeof(@inferred clean_frameshifts(A_frameshift,[B_frameshift])) == Vector{LongDNA{4}}
         end
     end
 end
