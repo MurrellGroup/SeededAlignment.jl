@@ -14,7 +14,7 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noi
     match_codons=false
     # unpack arguments and call the internal alignment function
     seed_chain_align(
-        A, B, moveset.match_moves, moveset.vert_moves, moveset.hor_moves,
+        A, B, moveset.vert_moves, moveset.hor_moves,
         scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_match_bonus, 
         scoring.kmerlength, match_codons, do_clean_frameshifts, verbose
     )
@@ -37,7 +37,7 @@ function seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset
     match_codons=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool)
     # unpack arguments and call the internal alignment function
     seed_chain_align(
-        ref, query, moveset.match_moves, moveset.vert_moves, moveset.hor_moves,
+        ref, query, moveset.vert_moves, moveset.hor_moves,
         scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_match_bonus,
         scoring.kmerlength, match_codons, do_clean_frameshifts, verbose
     )
@@ -84,10 +84,10 @@ function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmerLength)
 end
 
 function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::Matrix{Float64}, 
-    match_moves::NTuple{X,Move}, vgap_moves::NTuple{Y,Move}, hgap_moves::NTuple{Z,Move}, extension_score::Float64, k::Int64) where {X, Y, Z}
+    vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, extension_score::Float64, k::Int64) where {X, Y}
     
     # Produce constants used for estimating scores without A and B
-    min_match_score = minimum(t -> match_score_matrix[t, t], 1 : 4) + minimum(move -> move.score / move.step, match_moves)
+    min_match_score = minimum(t -> match_score_matrix[t, t], 1 : 4)
     gap_score_estimate = minimum(move -> move.score / move.step, (vgap_moves..., hgap_moves...))
     if gap_score_estimate > extension_score >= 0
         gap_score_estimate = (gap_score_estimate + 2 * extension_score) / 3 # approx_gap_score undefined, replaced with gap_score_estimate
@@ -196,9 +196,9 @@ function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::M
     return kmerPath
 end
 
-function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::NTuple{X,Move}, vgap_moves::NTuple{Y,Move}, hgap_moves::NTuple{Z,Move}, 
+function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
     match_score_matrix::Matrix{Float64}, extension_score::Float64 = -1.0, codon_match_bonus::Float64 = -2.0, kmerLength::Int64 = 12,
-    match_codons=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y, Z}
+    match_codons=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y}
 
     # throw exception if invalid alphabet in LongDNA{4}
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
@@ -207,7 +207,7 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::NTuple{X,Mo
     k = kmerLength
     # seeding heuristic
     kmerMatches = find_kmer_matches(A, B, k)
-    kmerPath = select_kmer_path(kmerMatches, length(A), length(B), match_score_matrix, match_moves, vgap_moves, hgap_moves, extension_score, k)    
+    kmerPath = select_kmer_path(kmerMatches, length(A), length(B), match_score_matrix, vgap_moves, hgap_moves, extension_score, k)    
     # parameters for joining kmers/seeds
     extra_kmer_margin = 6
     # Join kmers using needleman-wunsch
@@ -223,13 +223,13 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::NTuple{X,Mo
         if !(kmer.posA == prevA + k && kmer.posB == prevB + k)
             if prevA == -k+1 && prevB == -k+1
                 # align without cleaning frameshifts
-                alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_moves, vgap_moves, hgap_moves, 
+                alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, 
                     match_score_matrix, extension_score, codon_match_bonus, true, false, match_codons
                 )
                 result .*= alignment
             else
                 # align without cleaning frameshifts
-                alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], match_moves, vgap_moves, hgap_moves, 
+                alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, 
                     match_score_matrix, extension_score, codon_match_bonus, false, false, match_codons
                 )
                 result .*= alignment
@@ -240,7 +240,7 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::NTuple{X,Mo
         prevB = kmer.posB
     end
     # align the remaining parts of the sequences - without cleaning frameshifts
-    result .*= nw_align(A[prevA + k : end], B[prevB + k : end], match_moves, vgap_moves, hgap_moves, 
+    result .*= nw_align(A[prevA + k : end], B[prevB + k : end], vgap_moves, hgap_moves, 
         match_score_matrix, extension_score, codon_match_bonus, false, true, match_codons
     )
     if do_clean_frameshifts

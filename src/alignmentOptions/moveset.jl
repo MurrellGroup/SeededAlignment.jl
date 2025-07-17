@@ -74,7 +74,6 @@ end
 Defines the full set of allowed alignment moves used during pairwise or multiple sequence alignment.
 
 # Fields
-- `match_moves::Vector{Move}`: Moves that represent matches or substitutions between nucleotides.
 - `vert_moves::Vector{Move}`: Moves that introduce gaps in the **query (vertical)** sequence. 
 - `hor_moves::Vector{Move}`: Moves that introduce gaps in the **reference (horizontal)** sequence.
 
@@ -84,26 +83,17 @@ A `Moveset` groups the allowable `Move`s into categories used during dynamic pro
 Used by alignment algorithms such as `seed_chain_align` and  `msa_codon_align` to control the scoring and allowed operations during alignment.
 """
 
-#struct Moveset # TODO swap to tuples
-#    match_moves::Vector{Move}
-##    vert_moves::Vector{Move}
-#    hor_moves::Vector{Move}
-#end
-
-
 # stack allocated
-struct Moveset{X,Y,Z}
-    match_moves::NTuple{X,Move}
-    vert_moves::NTuple{Y,Move}
-    hor_moves::NTuple{Z,Move}
+struct Moveset{X,Y}
+    vert_moves::NTuple{X,Move}
+    hor_moves::NTuple{Y,Move}
 end
 
 
-Moveset(; match_moves, vert_moves, hor_moves) = Moveset(match_moves, vert_moves, hor_moves)
+Moveset(; vert_moves, hor_moves) = Moveset(vert_moves, hor_moves)
 
 function show(io::IO, ms::Moveset)
 	print(io, "Moveset(\n",
-            "  match_moves=$(ms.match_moves) \n",
             "  vert_moves=$(ms.vert_moves)\n)",
             "  hor_moves=$(ms.hor_moves) \n")
 end
@@ -128,18 +118,16 @@ Return a standard codon-aware `Moveset` for sequence alignment.
 Use this as a default `Moveset` for codon-preserving alignments.
 """
 function std_codon_moveset()
-    match_moves = (Move(1,.0),)
     vert_moves = (Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true))
     hor_moves =  (Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true))
-    return Moveset(match_moves,vert_moves,hor_moves)
+    return Moveset(vert_moves,hor_moves)
 end
 """
     pairwise_noisy_moveset()
 
 """
 function std_noisy_moveset()
-    match_moves = (Move(1,.0),)
     vert_moves = (Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,1,0, true))
     hor_moves =  (Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,1,0, true))
-    return Moveset(match_moves,vert_moves,hor_moves)
+    return Moveset(vert_moves,hor_moves)
 end

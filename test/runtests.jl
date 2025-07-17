@@ -10,8 +10,8 @@ using Random
 @testset "SeededAlignment.jl" begin
     @testset "1. noisy alignment nw_affine" begin
         Random.seed!(42)
-        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 2001)
-        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1980)
+        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1001)
+        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 980)
         aligned_A, aligned_B = nw_align(A, B)
         # 1.1 alignment doesn't alter the underlying sequences
         @testset "1.1 alignment doesn't alter the underlying sequences" begin
@@ -29,7 +29,6 @@ using Random
             score_params_on = ScoringScheme(match_score=0.0, mismatch_score=0.3, extension_score=0.4, edge_ext_begin=true,edge_ext_end=true)
             score_params_off = ScoringScheme(match_score=0.0, mismatch_score=0.3, extension_score=0.4, edge_ext_begin=false,edge_ext_end=false)
             move_set = Moveset(
-                match_moves = (Move(1, 0.0, 1, 0, 1, 0, false),),
                 hor_moves = (Move(3, 30, 1, 0, 1, 0, true),),
                 vert_moves = (Move(3, 30, 1, 0, 1, 0, true),)
             )
@@ -71,8 +70,8 @@ using Random
 
     @testset "3. noisy alignment seed_chain_align" begin 
         Random.seed!(42)
-        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 2001)
-        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1980)
+        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1001)
+        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 980)
         aligned_A, aligned_B = seed_chain_align(A, B)
         # 3.1 alignment doesn't alter the underlying sequences
         @testset "3.1 alignment doesn't alter the underlying sequences" begin

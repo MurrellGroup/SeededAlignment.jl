@@ -16,7 +16,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moves
     match_codons=false
     # unpack arguments and call the internal alignment function
     nw_align(
-        A, B, moveset.match_moves, moveset.vert_moves, moveset.hor_moves, 
+        A, B, moveset.vert_moves, moveset.hor_moves, 
         scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_match_bonus,
         scoring.edge_ext_begin, scoring.edge_ext_end, match_codons, do_clean_frameshifts, verbose
     )
@@ -37,16 +37,16 @@ function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_cod
     do_clean_frameshifts=false::Bool, verbose=false::Bool, match_codons=true::Bool)
     # unpack arguments and call the internal alignment function
     nw_align(
-        ref, query, moveset.match_moves, moveset.vert_moves, moveset.hor_moves, 
+        ref, query, moveset.vert_moves, moveset.hor_moves, 
         scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_match_bonus,
         scoring.edge_ext_begin, scoring.edge_ext_end, match_codons, do_clean_frameshifts, verbose
     )
 end
 
 # Needleman Wunsch alignment with affine scoring (internal function)
-function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::NTuple{X,Move}, vgap_moves::NTuple{Y,Move}, hgap_moves::NTuple{Z,Move}, 
+function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
     match_score_matrix::Matrix{Float64}, extension_score::Float64, codon_match_bonus::Float64 =-2.0, edge_extension_begin=false::Bool, 
-    edge_extension_end=false::Bool, match_codons=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y, Z}
+    edge_extension_end=false::Bool, match_codons=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y}
     
     # throw exception if invalid alphabet in LongDNA{4}
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
@@ -61,8 +61,8 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::NTuple{X,Move}, vga
     end
 
     # Offset indicies to avoid bounds-checking
-    column_offset = maximum(k -> k.step, (match_moves..., hgap_moves...)) + 1
-    row_offset = maximum(k -> k.step, (match_moves..., vgap_moves...)) + 1
+    column_offset = maximum(k -> k.step, hgap_moves) + 1
+    row_offset =    maximum(k -> k.step, vgap_moves) + 1
     column_boundary = n + column_offset
     row_boundary = m + row_offset
 
@@ -110,14 +110,12 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::NTuple{X,Move}, vga
                 end
             end
 
-            # find the best diagonal move
-            for k ∈ match_moves
-                mismatch_sum = sum(t -> match_score_matrix[toInt(A2[column_index - t]), toInt(B2[row_index - t])], 1 : k.step)
-                dp_matrix[row_index, column_index] = min(
-                    dp_matrix[row_index, column_index], 
-                    dp_matrix[row_index-k.step,column_index-k.step]+k.score+mismatch_sum
-                )
-            end
+            # check score if match current pair of nucleotides
+            match_score = match_score_matrix[toInt(A2[column_index - 1]), toInt(B2[row_index - 1])]
+            dp_matrix[row_index, column_index] = min(
+                dp_matrix[row_index, column_index], 
+                dp_matrix[row_index-1,column_index-1]+match_score
+            )
 
             # finds the best vertical move
             for k ∈ vgap_moves
@@ -267,22 +265,16 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, match_moves::NTuple{X,Move}, vga
                 end
 
                 if !match_Found
-                    # go through matching moves
-                    for k ∈ match_moves
-                        # calculate total (mis-)match score
-                        s = sum(t -> match_score_matrix[toInt(A2[x-t]), toInt(B2[y-t])], 1 : k.step)
-                        # check if the move leads to the current cell
-                        if isapprox(dp_matrix[y, x],dp_matrix[y - k.step,x - k.step] + k.score + s)
-                            # record the path
-                            for i ∈ 1:k.step
-                                push!(res_A, A2[x - i])
-                                push!(res_B, B2[y - i])
-                            end
-                            x -= k.step
-                            y -= k.step
-                            match_Found = true
-                            break
-                        end
+                    # calculate total (mis-)match score
+                    s = match_score_matrix[toInt(A2[x-1]), toInt(B2[y-1])]
+                    # check if the move leads to the current cell
+                    if isapprox(dp_matrix[y, x],dp_matrix[y - 1,x - 1] + s)
+                        # record the path
+                        push!(res_A, A2[x - 1])
+                        push!(res_B, B2[y - 1])
+                        x -= 1
+                        y -= 1
+                        match_Found = true
                     end
                 end
             end
