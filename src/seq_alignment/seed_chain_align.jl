@@ -48,17 +48,18 @@ function seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset
     seed_chain_align(
         ref, query, moveset.vert_moves, moveset.hor_moves,
         scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_score_matrix,
-        scoring.kmer_length, match_codons, do_clean_frameshifts, verbose
+        scoring.kmer_length, scoring.edge_ext_begin, scoring.edge_ext_end, match_codons, do_clean_frameshifts, verbose
     )
 end
 
 function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
-    match_score_matrix::Matrix{Float64}, extension_score::Float64, codon_score_matrix::Matrix{Float64}=BLOSUM62, kmer_length::Int64 = 18,
-    match_codons=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y}
+    match_score_matrix::Matrix{Float64}, extension_score::Float64, codon_score_matrix::Matrix{Float64}=BLOSUM62, 
+    kmer_length::Int64 = 18, edge_extension_begin=false::Bool, edge_extension_end=false::Bool, match_codons=false::Bool, 
+    do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y}
 
     # throw exception if invalid alphabet in LongDNA{4}
-    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
-    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), B) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
+    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides!\nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
+    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), B) || throw(ArgumentError("Input sequence contains non-standard nucleotides!\nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
     # Abbreviations
     k = kmer_length
     # seeding heuristic
@@ -80,7 +81,7 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Mov
             if prevA == -k+1 && prevB == -k+1
                 # align without cleaning frameshifts
                 alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, 
-                    match_score_matrix, extension_score, codon_score_matrix, true, false, match_codons
+                    match_score_matrix, extension_score, codon_score_matrix, edge_extension_begin, false, match_codons
                 )
                 result .*= alignment
             else
@@ -97,7 +98,7 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Mov
     end
     # align the remaining parts of the sequences - without cleaning frameshifts
     result .*= nw_align(A[prevA + k : end], B[prevB + k : end], vgap_moves, hgap_moves, 
-        match_score_matrix, extension_score, codon_score_matrix, false, true, match_codons
+        match_score_matrix, extension_score, codon_score_matrix, false, edge_extension_end, match_codons
     )
     if do_clean_frameshifts
         result[1], result[2] = clean_frameshifts(result[1], result[2], verbose = verbose)
