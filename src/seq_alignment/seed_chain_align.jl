@@ -88,7 +88,7 @@ function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::M
     
     # Produce constants used for estimating scores without A and B
     min_match_score = minimum(t -> match_score_matrix[t, t], 1 : 4)
-    gap_score_estimate = minimum(move -> move.score / move.step, (vgap_moves..., hgap_moves...))
+    gap_score_estimate = minimum(move -> move.score / move.step_length, (vgap_moves..., hgap_moves...))
     if gap_score_estimate > extension_score >= 0
         gap_score_estimate = (gap_score_estimate + 2 * extension_score) / 3 # approx_gap_score undefined, replaced with gap_score_estimate
     end

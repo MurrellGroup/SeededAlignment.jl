@@ -26,11 +26,11 @@ using Random
             C = LongDNA{4}("TTTAAAGGG")
             D = LongDNA{4}("AAAGGGCCC")
             # we test if we get different alignments from tweaking the boolean parameters
-            score_params_on = ScoringScheme(match_score=0.0, mismatch_score=0.3, extension_score=0.4, edge_ext_begin=true,edge_ext_end=true)
-            score_params_off = ScoringScheme(match_score=0.0, mismatch_score=0.3, extension_score=0.4, edge_ext_begin=false,edge_ext_end=false)
+            score_params_on = ScoringScheme(match_score=0.0, mismatch_score=0.5, extension_score=0.4, edge_ext_begin=true,edge_ext_end=true)
+            score_params_off = ScoringScheme(match_score=0.0, mismatch_score=0.5, extension_score=0.4, edge_ext_begin=false,edge_ext_end=false)
             move_set = Moveset(
-                hor_moves = (Move(3, 30, 1, 0, 1, 0, true),),
-                vert_moves = (Move(3, 30, 1, 0, 1, 0, true),)
+                hor_moves = (Move(ref=false, step_length=3, score=30.0, extendable=true),),
+                vert_moves = (Move(ref=false, step_length=3, score=30.0, extendable=true),)
             )
             
             # test start and end extension on
@@ -51,22 +51,20 @@ using Random
         
     end
 
-    # TODO finish this test case important, easy
-    #@testset "2. ref alignment nw_affine" begin
-    #     move_set = Moveset(
-    #            match_moves = [Move(1, 0.0, 1, 0, 1, 0, false)],
-    #            hor_moves = [Move(3, 30, 1, 0, 1, 0, true)],
-    #            vert_moves = [Move(3, 30, 1, 0, 1, 0, true)]
-    #        )
-    #    Random.seed!(42)
-    #    A = LongDNA{4}()
-    #    B = LongDNA{4}()
-    #    # reference informed alignment
-    #    aligned_A, aligned_B = nw_align(ref = A, query = B, clean_up_flag=true)
-    #    # 2.1 indels don't break codon readingframe
-    #    @test aligned_A == cleaned_A
-    #    @test aligned_B == cleaned_B
-    #end
+    @testset "2. ref alignment nw_affine" begin
+        move_set = Moveset(
+                hor_moves = (Move(ref=true, step_length=3, score=2.0, extendable=true),),
+                vert_moves =(Move(ref=true, step_length=3, score=2.0, extendable=true),)
+            )
+        Random.seed!(42)
+        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 198)
+        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 228)
+        # reference informed alignment
+        aligned_A, aligned_B = nw_align(ref = A, query = B, moveset=move_set, do_clean_frameshifts=true)
+        # 2.1 indels don't break codon readingframe
+        @test ungap(aligned_A) == A
+        @test ungap(aligned_B) == B
+    end
 
     @testset "3. noisy alignment seed_chain_align" begin 
         Random.seed!(42)
@@ -88,14 +86,20 @@ using Random
 
     end
 
-    # TODO finish this test case 
-    #@testset "4. ref alignment seed_chain_align" begin
-    #    Random.seed!(42)
-    #    A = LongDNA{4}()
-    #    B = LongDNA{4}()
-    #    # reference informed alignment
-    #    aligned_A, aligned_B = seed_chain_align(ref = A, query = B)
-    #end
+    @testset "4. ref alignment seed_chain_align" begin
+        move_set = Moveset(
+                hor_moves = (Move(ref=true, step_length=3, score=2.0, extendable=true),),
+                vert_moves =(Move(ref=true, step_length=3, score=2.0, extendable=true),)
+            )
+        Random.seed!(42)
+        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 198)
+        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 228)
+        # reference informed alignment
+        aligned_A, aligned_B = seed_chain_align(ref = A, query = B, moveset=move_set, do_clean_frameshifts=true, verbose=true)
+        # 4.1 indels don't break codon readingframe
+        @test ungap(aligned_A) == A
+        @test ungap(aligned_B) == B
+    end
 
     @testset "5. msa_codon_align" begin
         Random.seed!(42)

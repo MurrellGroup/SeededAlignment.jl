@@ -1,87 +1,20 @@
 import Base: show
-"""
-    Move
 
-Represents a single allowed alignment step between two sequences in the alignment matrix.
-
-# Fields
-- `step::Int`: How many aligned units (nucleotides) this move advances by.
-- `score::Float64`: Cost or score associated with performing this move.
-  
-### Reference to the top sequence (horizontal axis)
-- `horizontal_stride::Int`: How far this move advances along the top (reference) sequence.
-- `horizontal_phase::Int`: Frame offset in the top sequence; helps track codon boundaries.
-
-### Reference to the bottom sequence (vertical axis)
-- `vertical_stride::Int`: How far this move advances along the bottom (query) sequence.
-- `vertical_phase::Int`: Frame offset in the bottom sequence.
-
-- `extensionAble::Bool`: Whether this move can be extended (e.g., for affine gap penalties).
-
-# Description
-Moves define basic operations used in dynamic programming alignment: matches, mismatches, and gaps.
-Moves can preserve codon reading frames by keeping strides in multiples of 3 and matching phase positions.
-
-Two helper constructors are provided:
-- `Move(step, score, stride, phase, extensionAble)` assumes reference (vertical) stride and phase
-- `Move(step, score, extensionAble)` for simple moves with unit stride and zero phase.
-"""
-struct Move # TODO remove vertical_stride and phase for consistency
-    step::Int
+struct Move
+    ref::Bool
+    step_length::Int64
     score::Float64
+    extendable::Bool
 
-    # refers to readingFrame of top sequence 
-    horizontal_stride::Int
-    horizontal_phase::Int
-
-    # refers to readingFrame of bottom sequence
-    vertical_stride::Int
-    vertical_phase::Int
-
-    # allows moves to be extended from 
-    extensionAble::Bool
+    function Move(ref::Bool,  step_length::Int64, score::Float64, extendable::Bool)
+        (step_length in (1, 2, 3)) || throw(ArgumentError("step_length must be 1, 2, or 3"))
+        #(score < 0) || throw(ArgumentError("score must be negative"))
+        (!ref || (step_length == 3 && extendable)) || throw(ArgumentError("invalid ref:\n when ref=true it is required that step_length=3 and extendable=true."))
+        new(ref, step_length, score, extendable)
+    end
 end
-
 #TODO fix the useful constructor.
-
-Move(step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::Bool=false) =
-    Move(step, score, 1,0, stride, phase, extensionAble)
-
-#function Move(step::Int64, score::Float64, h_stride::Int64, h_phase::Int64, v_stride::Int64, v_phase::Int64, extensionAble::Bool=false)
-#   return Move(step, score, h_stride, h_phase, v_stride, v_phase, extensionAble)
-#end
-
-function Move(; step::Int64, score::Float64, stride::Int64, phase::Int64, extensionAble::Bool=false)
-    return Move(step, score, stride, phase, extensionAble)
-end
-
-Move(step::Int64, score::Float64, extensionAble::Bool=false) = Move(step, score, 1, 0, extensionAble)
-
-function show(io::IO, m::Move)
-	print(io, "Move(",
-			  "step=$(m.step), ",
-			  "score=$(m.score), ",
-              "h_stride=$(m.horizontal_stride), ",
-			  "h_phase=$(m.horizontal_phase), ",
-			  "v_stride=$(m.vertical_stride), ",
-			  "v_phase=$(m.vertical_phase), ",
-			  "extensionAble=$(m.extensionAble))")
-end
-
-"""
-    Moveset
-
-Defines the full set of allowed alignment moves used during pairwise or multiple sequence alignment.
-
-# Fields
-- `vert_moves::Vector{Move}`: Moves that introduce gaps in the **query (vertical)** sequence. 
-- `hor_moves::Vector{Move}`: Moves that introduce gaps in the **reference (horizontal)** sequence.
-
-# Description
-A `Moveset` groups the allowable `Move`s into categories used during dynamic programming alignment. Each type controls how the algorithm can transition between states, including nucleotide-level match and gap moves with customizable reading frame behavior.
-
-Used by alignment algorithms such as `seed_chain_align` and  `msa_codon_align` to control the scoring and allowed operations during alignment.
-"""
+Move(; ref=false::Bool, step_length::Int64, score::Float64, extendable=false) = Move(ref, step_length, score, extendable)
 
 # stack allocated
 struct Moveset{X,Y}
@@ -118,8 +51,8 @@ Return a standard codon-aware `Moveset` for sequence alignment.
 Use this as a default `Moveset` for codon-preserving alignments.
 """
 function std_codon_moveset()
-    vert_moves = (Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true))
-    hor_moves =  (Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,3,0, true))
+    vert_moves = (Move(ref=false, step_length=1, score=2.0, extendable=false), Move(ref=true, step_length = 3, score=2.0, extendable=true))
+    hor_moves =  (Move(ref=false, step_length=1, score=2.0, extendable=false), Move(ref=true, step_length = 3, score=2.0, extendable=true))
     return Moveset(vert_moves,hor_moves)
 end
 """
@@ -127,7 +60,7 @@ end
 
 """
 function std_noisy_moveset()
-    vert_moves = (Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,1,0, true))
-    hor_moves =  (Move(1, 2.0, 1, 0, 1,0, false), Move(3, 2.0, 1,0,1,0, true))
+    vert_moves = (Move(ref=false, step_length=1, score=2.0, extendable=false), Move(ref=false, step_length = 3, score=2.0, extendable=true))
+    hor_moves =  (Move(ref=false, step_length=1, score=2.0, extendable=false), Move(ref=false, step_length = 3, score=2.0, extendable=true))
     return Moveset(vert_moves,hor_moves)
 end
