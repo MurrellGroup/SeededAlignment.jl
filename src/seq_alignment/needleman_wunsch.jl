@@ -1,6 +1,6 @@
 """ 
     
-    nw_align(A::LongDNA{4},B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoringScheme=std_scoring()
+    nw_align(A::LongDNA{4},B::LongDNA{4}; moveset::Moveset=STD_NOISY_MOVESET, scoring::ScoringScheme=STD_SCORING
     
 Needleman_Wunsch wrapper - no reference, i.e. makes no assumptions about the two sequences. 
 
@@ -8,7 +8,7 @@ Computes an optimal global pairwise alignment of two ungapped `LongDNA{4}` seque
 with respect to the `Moveset` and the `ScoringScheme`. 
 
 """
-function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoringScheme=std_scoring())
+function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=STD_NOISY_MOVESET, scoring::ScoringScheme=STD_SCORING)
     # check no reference informed moves (Moev.ref=true) in moveset
     !contains_ref_move(moveset) || throw(ArgumentError("Moveset contains move(s) that considers reading frame (Move.ref=true)", 
                                                        " when no reference sequence was given!\n","Either set Move.ref=false for all moves in moveset", 
@@ -21,14 +21,14 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moves
     # unpack arguments and call the internal alignment function
     nw_align(
         A, B, moveset.vert_moves, moveset.hor_moves, 
-        scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_match_bonus,
+        scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_score_matrix,
         scoring.edge_ext_begin, scoring.edge_ext_end, match_codons, do_clean_frameshifts, verbose
     )
 end
 
 """ 
     
-    nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(),
+    nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING,
         do_clean_frameshifts=false::Bool, verbose=false::Bool, match_codons=true::Bool)
 
 Needleman_Wunsch wrapper - reference informed, i.e. assumes one of the sequence has intact reading frame. 
@@ -37,7 +37,7 @@ Optimally aligns a `query` sequence to a `ref` sequence using a codon-aware `Mov
 
 **NOTE** We always assume the readingFrame is 1
 """
-function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(), 
+function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
     do_clean_frameshifts=false::Bool, verbose=false::Bool, match_codons=true::Bool)
 
     # check that moveset takes reference reading frame into account
@@ -47,14 +47,14 @@ function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_cod
     # unpack arguments and call the internal alignment function
     nw_align(
         ref, query, moveset.vert_moves, moveset.hor_moves, 
-        scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_match_bonus,
+        scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_score_matrix,
         scoring.edge_ext_begin, scoring.edge_ext_end, match_codons, do_clean_frameshifts, verbose
     )
 end
 
 # Needleman Wunsch alignment with affine scoring (internal function)
 function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
-    match_score_matrix::Matrix{Float64}, extension_score::Float64, codon_match_bonus::Float64 =-2.0, edge_extension_begin=false::Bool, 
+    nuc_score_matrix::Matrix{Float64}, extension_score::Float64, codon_score_matrix::Matrix{Float64}=BLOSUM62, edge_extension_begin=false::Bool, 
     edge_extension_end=false::Bool, match_codons=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y}
     
     # throw exception if invalid alphabet in LongDNA{4}
@@ -107,20 +107,23 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
                 # performance optimized translation
                 ref_AA = fast_translate((A2[column_index-3],A2[column_index-2],A2[column_index-1]))
                 seq_AA = fast_translate((B2[row_index-3],B2[row_index-2],B2[row_index-1]))
-                if  ref_AA == seq_AA
-                    # reward codon_match
-                    mismatch_sum = sum(t -> match_score_matrix[toInt(A2[column_index - t]), toInt(B2[row_index - t])], 1 : 3)
-                    mismatch_sum += codon_match_bonus
+                # TODO handle stop codon
+                if ref_AA != AminoAcid('*') && seq_AA != AminoAcid('*')
+                    # get codon_mismatch_score
+                    codon_match_score = codon_score_matrix[toInt(ref_AA),toInt(seq_AA)]
+                    # get nucleotide mismatch_score
+                    match_score = sum(t -> nuc_score_matrix[toInt(A2[column_index - t]), toInt(B2[row_index - t])], 1 : 3)
+                    match_score += codon_match_score
                     # update dp_matrix
                     dp_matrix[row_index, column_index] = min(
-                        dp_matrix[row_index, column_index], 
-                        dp_matrix[row_index-3,column_index-3]+mismatch_sum
-                    )
+                        dp_matrix[row_index, column_index],
+                        dp_matrix[row_index-3,column_index-3]+match_score
+                    ) 
                 end
             end
 
             # check score if match current pair of nucleotides
-            match_score = match_score_matrix[toInt(A2[column_index - 1]), toInt(B2[row_index - 1])]
+            match_score = nuc_score_matrix[toInt(A2[column_index - 1]), toInt(B2[row_index - 1])]
             dp_matrix[row_index, column_index] = min(
                 dp_matrix[row_index, column_index], 
                 dp_matrix[row_index-1,column_index-1]+match_score
@@ -251,14 +254,16 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
             if !must_move_hor && !must_move_ver
                 # reward for matching codons if enabled
                 if match_codons && (top_sequence_pos) % 3 == 0
-                    mismatch_sum = sum(t -> match_score_matrix[toInt(A2[x - t]), toInt(B2[y - t])], 1 : 3)
                     ref_AA = fast_translate((A2[x-3],A2[x-2],A2[x-1]))
                     seq_AA = fast_translate((B2[y-3],B2[y-2],B2[y-1]))
-                    if ref_AA == seq_AA
-                        # reward codon_match
-                        mismatch_sum += codon_match_bonus
+                    # TODO handle stop codon more flexibly
+                    if ref_AA != AminoAcid('*') && seq_AA != AminoAcid('*')
+                        # get codon_match_score
+                        match_score = codon_score_matrix[toInt(ref_AA), toInt(seq_AA)]
+                        # get nucleotide_match_score
+                        match_score += sum(t -> nuc_score_matrix[toInt(A2[x - t]), toInt(B2[y - t])], 1 : 3)
                         # check if the move leads to the current cell
-                        if isapprox(dp_matrix[y, x],dp_matrix[y - 3,x - 3] + mismatch_sum)
+                        if isapprox(dp_matrix[y, x],dp_matrix[y - 3,x - 3] + match_score)
                             # record the path
                             for i ∈ 1:3
                                 push!(res_A, A2[x - i])
@@ -273,7 +278,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
 
                 if !match_Found
                     # calculate total (mis-)match score
-                    s = match_score_matrix[toInt(A2[x-1]), toInt(B2[y-1])]
+                    s = nuc_score_matrix[toInt(A2[x-1]), toInt(B2[y-1])]
                     # check if the move leads to the current cell
                     if isapprox(dp_matrix[y, x],dp_matrix[y - 1,x - 1] + s)
                         # record the path
@@ -356,7 +361,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
             end
         end
     end
-    # full alignment 
+    # full alignment
     aligned_A = reverse(res_A)
     aligned_B = reverse(res_B)
     # clean_up single indels if enabled
@@ -365,53 +370,4 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
     end
     # return alignment
     return aligned_A, aligned_B
-end
-
-# helper functions and constants
-
-# Convert NucleicAcid to integer A -> 1, C -> 2, G -> 3, T -> 4
-toInt(x::NucleicAcid) = trailing_zeros(reinterpret(UInt8, x)) + 1
-
-const codon_table::Vector{AminoAcid} = AminoAcid[
-    # AAA AAC AAG AAT
-    AminoAcid('K'), AminoAcid('N'), AminoAcid('K'), AminoAcid('N'),
-    # ACA ACC ACG ACT
-    AminoAcid('T'), AminoAcid('T'), AminoAcid('T'), AminoAcid('T'),
-    # AGA AGC AGG AGT
-    AminoAcid('R'), AminoAcid('S'), AminoAcid('R'), AminoAcid('S'),
-    # ATA ATC ATG ATT
-    AminoAcid('I'), AminoAcid('I'), AminoAcid('M'), AminoAcid('I'),
-
-    # CAA CAC CAG CAT
-    AminoAcid('Q'), AminoAcid('H'), AminoAcid('Q'), AminoAcid('H'),
-    # CCA CCC CCG CCT
-    AminoAcid('P'), AminoAcid('P'), AminoAcid('P'), AminoAcid('P'),
-    # CGA CGC CGG CGT
-    AminoAcid('R'), AminoAcid('R'), AminoAcid('R'), AminoAcid('R'),
-    # CTA CTC CTG CTT
-    AminoAcid('L'), AminoAcid('L'), AminoAcid('L'), AminoAcid('L'),
-
-    # GAA GAC GAG GAT
-    AminoAcid('E'), AminoAcid('D'), AminoAcid('E'), AminoAcid('D'),
-    # GCA GCC GCG GCT
-    AminoAcid('A'), AminoAcid('A'), AminoAcid('A'), AminoAcid('A'),
-    # GGA GGC GGG GGT
-    AminoAcid('G'), AminoAcid('G'), AminoAcid('G'), AminoAcid('G'),
-    # GTA GTC GTG GTT
-    AminoAcid('V'), AminoAcid('V'), AminoAcid('V'), AminoAcid('V'),
-
-    # TAA TAC TAG TAT
-    AminoAcid('*'), AminoAcid('Y'), AminoAcid('*'), AminoAcid('Y'),
-    # TCA TCC TCG TCT
-    AminoAcid('S'), AminoAcid('S'), AminoAcid('S'), AminoAcid('S'),
-    # TGA TGC TGG TGT
-    AminoAcid('*'), AminoAcid('C'), AminoAcid('W'), AminoAcid('C'),
-    # TTA TTC TTG TTT
-    AminoAcid('L'), AminoAcid('F'), AminoAcid('L'), AminoAcid('F')
-]
-
-function fast_translate(dna_seq::NTuple{3, DNA})
-    # TODO unit test the codon_table
-    hash_index = (toInt(dna_seq[1])-1)*16 + (toInt(dna_seq[2])-1)*4 + toInt(dna_seq[3])
-    return codon_table[hash_index]
 end

@@ -9,6 +9,7 @@ export LongDNA
 # exports utilities
 include("utils/fasta_io.jl")
 # structs for alignment flexibility
+include("alignmentOptions/constants_and_helpers.jl")
 include("alignmentOptions/moveset.jl")
 include("alignmentOptions/scoring_scheme.jl")
 # clean_up functionality for pairwise and multiple sequence alignment

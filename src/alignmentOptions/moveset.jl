@@ -5,7 +5,7 @@ struct Move
     step_length::Int64
     score::Float64
     extendable::Bool
-
+    # force construction invariants
     function Move(ref::Bool,  step_length::Int64, score::Float64, extendable::Bool)
         (step_length in (1, 2, 3)) || throw(ArgumentError("step_length must be 1, 2, or 3"))
         #(score < 0) || throw(ArgumentError("score must be negative"))
@@ -13,10 +13,19 @@ struct Move
         new(ref, step_length, score, extendable)
     end
 end
+
 # useful constructors
-Move(; ref=false::Bool, step_length::Int64, score::Float64, extendable=false) = Move(ref, step_length, score, extendable)
+function Move(; ref=false::Bool, step_length::Int64, score::Float64, extendable=false) 
+    Move(ref, step_length, score, extendable)
+end
 # assumes ref true
-Move(; score::Float64) = Move(ref=true, step_length=3, score=score, extendable=true)
+function RefMove(; score::Float64) 
+    Move(ref=true, step_length=3, score=score, extendable=true)
+end
+# assumes ref false
+function FrameshiftMove(; step_length::Int64, score::Float64, extendable::Bool=false)
+    Move(ref=false, step_length=step_length, score=score, extendable=extendable)
+end
 
 # stack allocated 
 struct Moveset{X,Y}
@@ -26,7 +35,9 @@ struct Moveset{X,Y}
     hor_moves::NTuple{Y,Move}
 end
 # reference informed Moveset constructor
-Moveset(; ref_insertions, ref_deletions) = Moveset(ref_insertions, ref_deletions)
+function Moveset(; ref_insertions, ref_deletions) 
+    Moveset(ref_insertions, ref_deletions)
+end
 # non-reference informed Moveset constructor - alignment operations are symmetric
 Moveset(gap_moves) = Moveset(gap_moves, gap_moves)
 
@@ -38,36 +49,19 @@ function contains_ref_move(moveset::Moveset)
     ref_move_found = any(move.ref for move in moveset.vert_moves) || any(move.ref for move in moveset.hor_moves)
     return ref_move_found
 end
-"""
-    std_codon_moveset()
 
-Return a standard codon-aware `Moveset` for sequence alignment.
-
-# Returns
-- `Moveset`: Contains codon-aware match and gap moves.
-
-# Moves
-- Match: `Move(1, 0.0)`
-- Horizontal (gaps in reference sequence):
-  - `Move(1, 2.0, 1, 0, 1, 0, false)`
-  - `Move(3, 2.0, 1, 0, 3, 0, true)`
-- Vertical (gaps in query sequence):
-  - `Move(1, 2.0, 1, 0, 1, 0, false)`
-  - `Move(3, 2.0, 1, 0, 3, 0, true)`
-
-Use this as a default `Moveset` for codon-preserving alignments.
-"""
-function std_codon_moveset()
-    vert_moves = (Move(ref=false, step_length=1, score=2.0, extendable=false), Move(ref=true, step_length = 3, score=2.0, extendable=true))
-    hor_moves =  (Move(ref=false, step_length=1, score=2.0, extendable=false), Move(ref=true, step_length = 3, score=2.0, extendable=true))
-    return Moveset(vert_moves,hor_moves)
-end
-"""
-    pairwise_noisy_moveset()
-
-"""
-function std_noisy_moveset()
-    vert_moves = (Move(ref=false, step_length=1, score=2.0, extendable=false), Move(ref=false, step_length = 3, score=2.0, extendable=true))
-    hor_moves =  (Move(ref=false, step_length=1, score=2.0, extendable=false), Move(ref=false, step_length = 3, score=2.0, extendable=true))
-    return Moveset(vert_moves,hor_moves)
-end
+# default movesets
+# deletions same as insertions
+const STD_CODON_MOVESET = Moveset(
+    (
+        Move(ref=false, step_length=1, score=2.0, extendable=false),
+        Move(ref=true,  step_length=3, score=2.0, extendable=true)
+    )
+)
+# deletions same as insertions
+const STD_NOISY_MOVESET = Moveset(
+    (
+        Move(ref=false, step_length=1, score=2.0, extendable=false),
+        Move(ref=false, step_length=3, score=2.0, extendable=true)
+    )
+)

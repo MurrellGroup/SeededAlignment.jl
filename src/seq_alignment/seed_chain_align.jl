@@ -1,12 +1,12 @@
 """
-    seed_chain_align(A::LongDNA{4},B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoringScheme=std_scoring()
+    seed_chain_align(A::LongDNA{4},B::LongDNA{4}; moveset::Moveset=STD_NOISY_MOVESET, scoring::ScoringScheme=STD_SCORING
     
 seed_chain_align wrapper - no reference, i.e. makes no assumptions about the two sequences. 
 
 Computes a heuristically guided global pairwise alignment of two ungapped `LongDNA{4}` sequence based on seeding. The seeds are then joined together 
 by doing a partial alignment with nw_align between seeds optimally with repect to the `Moveset` and `ScoringScheme`.
 """
-function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoringScheme=std_scoring())
+function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=STD_NOISY_MOVESET, scoring::ScoringScheme=STD_SCORING)
     # check no reference informed moves (Moev.ref=true) in moveset
     !contains_ref_move(moveset) || throw(ArgumentError("Moveset contains move(s) that considers reading frame (Move.ref=true)", 
                                                        " when no reference sequence was given!\n","Either set Move.ref=false for all moves in moveset", 
@@ -19,15 +19,15 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noi
     # unpack arguments and call the internal alignment function
     seed_chain_align(
         A, B, moveset.vert_moves, moveset.hor_moves,
-        scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_match_bonus, 
-        scoring.kmerlength, match_codons, do_clean_frameshifts, verbose
+        scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_score_matrix, 
+        scoring.kmer_length, match_codons, do_clean_frameshifts, verbose
     )
 
 end
 
 """ 
     
-    seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(),
+    seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING,
         do_clean_frameshifts=false::Bool, verbose=false::Bool, match_codons=true::Bool)
 
 seed_chain_align wrapper - reference informed, i.e. assumes one of the sequence has intact reading frame. 
@@ -37,7 +37,7 @@ by doing a partial alignment with nw_align between seeds optimally with repect t
 
 **NOTE** We always assume the readingFrame is 1
 """
-function seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(), 
+function seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
     match_codons=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool)
 
     # check that moveset takes reference reading frame into account
@@ -47,20 +47,20 @@ function seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset
     # unpack arguments and call the internal alignment function
     seed_chain_align(
         ref, query, moveset.vert_moves, moveset.hor_moves,
-        scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_match_bonus,
-        scoring.kmerlength, match_codons, do_clean_frameshifts, verbose
+        scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_score_matrix,
+        scoring.kmer_length, match_codons, do_clean_frameshifts, verbose
     )
 end
 
 function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
-    match_score_matrix::Matrix{Float64}, extension_score::Float64 = -1.0, codon_match_bonus::Float64 = -2.0, kmerLength::Int64 = 12,
+    match_score_matrix::Matrix{Float64}, extension_score::Float64, codon_score_matrix::Matrix{Float64}=BLOSUM62, kmer_length::Int64 = 18,
     match_codons=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y}
 
     # throw exception if invalid alphabet in LongDNA{4}
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), B) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
     # Abbreviations
-    k = kmerLength
+    k = kmer_length
     # seeding heuristic
     kmerMatches = find_kmer_matches(A, B, k)
     kmerPath = select_kmer_path(kmerMatches, length(A), length(B), match_score_matrix, vgap_moves, hgap_moves, extension_score, k)    
@@ -80,13 +80,13 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Mov
             if prevA == -k+1 && prevB == -k+1
                 # align without cleaning frameshifts
                 alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, 
-                    match_score_matrix, extension_score, codon_match_bonus, true, false, match_codons
+                    match_score_matrix, extension_score, codon_score_matrix, true, false, match_codons
                 )
                 result .*= alignment
             else
                 # align without cleaning frameshifts
                 alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, 
-                    match_score_matrix, extension_score, codon_match_bonus, false, false, match_codons
+                    match_score_matrix, extension_score, codon_score_matrix, false, false, match_codons
                 )
                 result .*= alignment
             end
@@ -97,7 +97,7 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Mov
     end
     # align the remaining parts of the sequences - without cleaning frameshifts
     result .*= nw_align(A[prevA + k : end], B[prevB + k : end], vgap_moves, hgap_moves, 
-        match_score_matrix, extension_score, codon_match_bonus, false, true, match_codons
+        match_score_matrix, extension_score, codon_score_matrix, false, true, match_codons
     )
     if do_clean_frameshifts
         result[1], result[2] = clean_frameshifts(result[1], result[2], verbose = verbose)

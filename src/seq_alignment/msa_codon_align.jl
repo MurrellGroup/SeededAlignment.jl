@@ -1,10 +1,10 @@
 """
-    msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(), 
+    msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
         match_codons=true::Bool, use_seeded=true::Bool)
 
 emm idk...
 """
-function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(), 
+function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
         match_codons=true::Bool, use_seeded=true::Bool)
     cleaned_codon_alignment = Vector{LongDNA{4}}(undef, length(seqs)+1)
     # perform pairwise seeded alignment for each sequence and clean indels which violate the reference readingFrame

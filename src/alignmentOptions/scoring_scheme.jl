@@ -26,43 +26,42 @@ score_params = ScoringScheme(extension_score = 0.3, mismatch_score = 0.7) # (eve
 ```
 """
 struct ScoringScheme
-	# 1=A, 2=C, 3=G, 4=T for both row and column indicies
-	nucleotide_score_matrix::Matrix{Float64}
-	# extending gap penalty
+	# global extending gap penalty
 	extension_score::Float64
-	# start and end extension bools 
+	# if seeding - set seed_length
+	kmer_length::Int64
+	# start and end extension bools
 	edge_ext_begin::Bool
 	edge_ext_end::Bool
-	# (opt arg) if match_codons in aligner function
-	# TODO replace with codon scoring matrix
+
+	# substitution scoring:
+	# row and column indicies: 1=A, 2=C, 3=G, 4=T 
+	nucleotide_score_matrix::Matrix{Float64}
+	# only used in ref-query if match_codons=true in nw_align, seed_chain_align or msa_codon_align
+	codon_score_matrix::Matrix{Float64}
 	# codon order: 1=F 2=L 3=S 4=Y 5=C 
 	#			   6=W 7=P 8=H 9=Q 10=R 
 	#              11=I 12=M 13=T 14=N 15=K
 	#              16=V 17=A 18=D 19=E 20=G
 	#              21="*" stop codon
 	# based on the order of the genetic code
-	#codon_score_matrix::Matrix{Float64}
-	codon_match_bonus::Float64 
-	#stop_codon_penalty::Float64 # TODO add large stop codon penalty
-	# (opt arg) if seeding
-	kmerlength::Int64
-	
+
+	function ScoringScheme(extension_score::Float64, kmer_length::Int64, edge_ext_begin::Bool, edge_ext_end::Bool,
+		nucleotide_score_matrix::Matrix{Float64}, codon_score_matrix::Matrix{Float64})
+		# TODO add construction invariants
+
+		new(extension_score::Float64, kmer_length::Int64, edge_ext_begin::Bool, edge_ext_end::Bool,
+			nucleotide_score_matrix::Matrix{Float64}, codon_score_matrix::Matrix{Float64})
+	end
 end
 
-# ScoringScheme construction wrapper
-function ScoringScheme(; nucleotide_score_matrix::Union{Matrix{Float64},Nothing}=nothing, match_score::Float64 = 0.0, mismatch_score::Float64=0.7,
-		extension_score::Float64=0.4, edge_ext_begin=true::Bool, edge_ext_end=true::Bool, 
-		codon_match_bonus::Float64=-2.0, kmerlength::Int64=18)
+# ScoringScheme construction wrapper # TODO handle stop codon
+function ScoringScheme(; extension_score::Float64=0.4, kmer_length::Int64=18, edge_ext_begin=true::Bool, edge_ext_end=true::Bool, 
+		nucleotide_score_matrix=NUC_MATRIX, codon_score_matrix=BLOSUM62)
 
-	# give a default simple match/mismatch matrix if no score_matrix provided
-	if nucleotide_score_matrix == nothing
-		nucleotide_score_matrix = simple_match_penalty_matrix(match_score, mismatch_score)
-	end
 	# call actual constructor
-	return ScoringScheme(nucleotide_score_matrix,extension_score,
-		edge_ext_begin,edge_ext_end,
-		codon_match_bonus,kmerlength
-	)	
+	ScoringScheme(extension_score::Float64, kmer_length::Int64, edge_ext_begin::Bool, edge_ext_end::Bool,
+		nucleotide_score_matrix::Matrix{Float64}, codon_score_matrix::Matrix{Float64})
 end
 
 import Base: show
@@ -76,6 +75,17 @@ function show(io::IO, s::ScoringScheme)
 			  "codon_match_bonus=$(s.codon_match_bonus), ",
 			  "kmer=$(s.kmerlength))")
 end
+
+# matrix constructor helper method
+function simple_match_penalty_matrix(match_score, mismatch_score, n=4)
+    m = fill(mismatch_score, n, n)
+    for i in 1:n
+        m[i,i] = match_score
+    end
+    return m
+end
+
+# default movesets and ScoringSchemes
 
 """
     std_codon_scoring()
@@ -94,35 +104,12 @@ Return a standard codon-aware `ScoringScheme` for alignment.
 
 Use this as a default `ScoringScheme` for codon-preserving alignments.
 """
-function std_scoring()
-	# params for nucleotide_score_matrix
-	match_score = 0.0
-	mismatch_score = 0.7
-	# scoring stuff
-	extension_score = 0.4
-	# start and end extension bools
-	edge_ext_begin = true
-	edge_ext_end = true
-	# (opt arg) if match_codons in aligner function
-	codon_match_bonus = -2.0
-	# (opt arg) if seeding
-	kmerlength = 18
-
-	return ScoringScheme(match_score=match_score,
-					   mismatch_score=mismatch_score,
-					   extension_score=extension_score,
-					   edge_ext_begin=edge_ext_begin,
-					   edge_ext_end=edge_ext_end,
-					   codon_match_bonus=codon_match_bonus,
-					   kmerlength=kmerlength
-	)
-end
-
-# matrix constructor helper method
-function simple_match_penalty_matrix(match_score, mismatch_score, n=4)
-    m = fill(mismatch_score, n, n)
-    for i in 1:n
-        m[i,i] = match_score
-    end
-    return m
-end
+# TODO handle stop codon
+const STD_SCORING = ScoringScheme(
+	extension_score=0.4,
+	kmer_length=18,
+	edge_ext_begin=true,
+	edge_ext_end=true,
+	nucleotide_score_matrix=NUC_MATRIX,
+	codon_score_matrix=BLOSUM62
+)
