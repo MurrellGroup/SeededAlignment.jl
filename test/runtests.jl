@@ -126,13 +126,13 @@ using Random
         @testset "5.3 type inferrence" begin
             @test typeof(@inferred msa_codon_align(ref, seqs)) == Vector{LongDNA{4}}
         end
-        # 5.4 resolve_codon_insertions (internal method in msa_codon_align) handles codon insertions as expected
-        @testset "5.4 resolve_codon_insertions (internal method in msa_codon_align) handles codon insertions as expected" begin
+        # 5.4 scaffold_msa_from_pairwise (internal method in msa_codon_align) goes from pairwise alignments to MSA
+        @testset "5.4 scaffold_msa_from_pairwise (internal method in msa_codon_align) handles codon insertions as expected" begin
             aligned_ref1 = LongDNA{4}("ATG---TTTCCCGGGTAA")
             aligned_seq1 = LongDNA{4}("ATGTTTTTTCCCGGGTAA")
             aligned_ref2 = LongDNA{4}("---ATG---TTTCCCGGGTAA---")
             aligned_seq2 = LongDNA{4}("ATGATGTTTTTTCCCGGGTAAGGG")
-            msa = SeededAlignment.resolve_codon_insertions([aligned_ref1,aligned_ref2], [aligned_seq1,aligned_seq2])
+            msa = SeededAlignment.scaffold_msa_from_pairwise([aligned_ref1,aligned_ref2], [aligned_seq1,aligned_seq2])
             # compare with expected scaffolded msa
             @test msa[1] == LongDNA{4}("---ATG---TTTCCCGGGTAA---")
             @test msa[2] == LongDNA{4}("---ATGTTTTTTCCCGGGTAA---")

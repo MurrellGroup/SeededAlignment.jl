@@ -10,7 +10,7 @@ function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Mov
     # perform pairwise seeded alignment for each sequence and clean indels which violate the reference readingFrame
     cleaned_refs, cleaned_seqs = align_all_to_reference(ref, seqs, moveset, scoring, use_seeded = use_seeded, match_codons = match_codons, do_clean_frameshifts=true)
     # resolve codon_insertion ambigiouity via left-stacking relative to reference
-    msa = resolve_codon_insertions(cleaned_refs, cleaned_seqs)
+    msa = scaffold_msa_from_pairwise(cleaned_refs, cleaned_seqs)
     return msa
 end
 
@@ -86,7 +86,7 @@ function find_triplet_insertions_codonindex(aligned_ref::LongDNA{4})
 end
 
 # TODO implement the speedup version of this
-function resolve_codon_insertions(cleaned_refs::Vector{LongDNA{4}}, cleaned_seqs::Vector{LongDNA{4}})
+function scaffold_msa_from_pairwise(cleaned_refs::Vector{LongDNA{4}}, cleaned_seqs::Vector{LongDNA{4}})
     # NOTE: we assume that 
     ref = ungap(cleaned_refs[1])
     # TODO test if slight differences between cleaned_refs might still work
