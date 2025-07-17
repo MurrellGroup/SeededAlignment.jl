@@ -9,7 +9,10 @@ with respect to the `Moveset` and the `ScoringScheme`.
 
 """
 function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoringScheme=std_scoring())
-    !contains_ref_move(moveset) || throw(ArgumentError("moveset contains move(s) that consider "))
+    # check no reference informed moves (Moev.ref=true) in moveset
+    !contains_ref_move(moveset) || throw(ArgumentError("Moveset contains move(s) that considers reading frame (Move.ref=true)", 
+                                                       " when no reference sequence was given!\n","Either set Move.ref=false for all moves in moveset", 
+                                                    "if you want to align without a reference sequence. Specify by nw_align(ref=seq1, query=seq2)."))
     # force no clean_up
     do_clean_frameshifts=false
     verbose=false
@@ -41,7 +44,6 @@ function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_cod
     contains_ref_move(moveset) || throw(ArgumentError("Invalid Moveset for reference to query alignment!\n", 
                                         "At least one Move in Moveset must consider reference reading (Move.ref=true)",
                                         " - in other words codon insertions or deletions must be allowed."))
-
     # unpack arguments and call the internal alignment function
     nw_align(
         ref, query, moveset.vert_moves, moveset.hor_moves, 
@@ -101,9 +103,9 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
             top_sequence_pos = (column_index-column_offset)
             left_sequence_pos = (row_index-row_offset)
             # reward for matching codons if enabled
-            if match_codons && (top_sequence_pos) % 3 == 0 # FIXME bug keeps occuring here for some reason. 
+            if match_codons && (top_sequence_pos) % 3 == 0
                 # performance optimized translation
-                ref_AA = fast_translate((A2[column_index-3],A2[column_index-2],A2[column_index-1])) # FIXME bug keeps occuring here for some reason.
+                ref_AA = fast_translate((A2[column_index-3],A2[column_index-2],A2[column_index-1]))
                 seq_AA = fast_translate((B2[row_index-3],B2[row_index-2],B2[row_index-1]))
                 if  ref_AA == seq_AA
                     # reward codon_match

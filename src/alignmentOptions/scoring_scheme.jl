@@ -39,9 +39,11 @@ struct ScoringScheme
 	#			   6=W 7=P 8=H 9=Q 10=R 
 	#              11=I 12=M 13=T 14=N 15=K
 	#              16=V 17=A 18=D 19=E 20=G
+	#              21="*" stop codon
 	# based on the order of the genetic code
 	#codon_score_matrix::Matrix{Float64}
-	codon_match_bonus::Float64 # TODO add large stop codon penalty
+	codon_match_bonus::Float64 
+	#stop_codon_penalty::Float64 # TODO add large stop codon penalty
 	# (opt arg) if seeding
 	kmerlength::Int64
 	
