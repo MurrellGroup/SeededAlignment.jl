@@ -14,13 +14,13 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=STD_NOI
     # force no clean_up
     do_clean_frameshifts=false
     verbose=false
-    # force no match_codons
-    match_codons=false
+    # force no codon_scoring_on
+    codon_scoring_on=false
     # unpack arguments and call the internal alignment function
     seed_chain_align(
         A, B, moveset.vert_moves, moveset.hor_moves,
         scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_score_matrix, 
-        scoring.kmer_length, match_codons, do_clean_frameshifts, verbose
+        scoring.kmer_length, codon_scoring_on, do_clean_frameshifts, verbose
     )
 
 end
@@ -28,7 +28,7 @@ end
 """ 
     
     seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING,
-        do_clean_frameshifts=false::Bool, verbose=false::Bool, match_codons=true::Bool)
+        do_clean_frameshifts=false::Bool, verbose=false::Bool, codon_scoring_on=true::Bool)
 
 seed_chain_align wrapper - reference informed, i.e. assumes one of the sequence has intact reading frame. 
 
@@ -38,7 +38,7 @@ by doing a partial alignment with nw_align between seeds optimally with repect t
 **NOTE** We always assume the readingFrame is 1
 """
 function seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
-    match_codons=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool)
+    codon_scoring_on=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool)
 
     # check that moveset takes reference reading frame into account
     contains_ref_move(moveset) || throw(ArgumentError("Invalid Moveset for reference to query alignment!\n", 
@@ -48,13 +48,13 @@ function seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset
     seed_chain_align(
         ref, query, moveset.vert_moves, moveset.hor_moves,
         scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_score_matrix,
-        scoring.kmer_length, scoring.edge_ext_begin, scoring.edge_ext_end, match_codons, do_clean_frameshifts, verbose
+        scoring.kmer_length, scoring.edge_ext_begin, scoring.edge_ext_end, codon_scoring_on, do_clean_frameshifts, verbose
     )
 end
 
 function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
     match_score_matrix::Matrix{Float64}, extension_score::Float64, codon_score_matrix::Matrix{Float64}=BLOSUM62, 
-    kmer_length::Int64 = 18, edge_extension_begin=false::Bool, edge_extension_end=false::Bool, match_codons=false::Bool, 
+    kmer_length::Int64 = 18, edge_extension_begin=false::Bool, edge_extension_end=false::Bool, codon_scoring_on=false::Bool, 
     do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y}
 
     # throw exception if invalid alphabet in LongDNA{4}
@@ -81,13 +81,13 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Mov
             if prevA == -k+1 && prevB == -k+1
                 # align without cleaning frameshifts
                 alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, 
-                    match_score_matrix, extension_score, codon_score_matrix, edge_extension_begin, false, match_codons
+                    match_score_matrix, extension_score, codon_score_matrix, edge_extension_begin, false, codon_scoring_on
                 )
                 result .*= alignment
             else
                 # align without cleaning frameshifts
                 alignment = nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, 
-                    match_score_matrix, extension_score, codon_score_matrix, false, false, match_codons
+                    match_score_matrix, extension_score, codon_score_matrix, false, false, codon_scoring_on
                 )
                 result .*= alignment
             end
@@ -98,7 +98,7 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Mov
     end
     # align the remaining parts of the sequences - without cleaning frameshifts
     result .*= nw_align(A[prevA + k : end], B[prevB + k : end], vgap_moves, hgap_moves, 
-        match_score_matrix, extension_score, codon_score_matrix, false, edge_extension_end, match_codons
+        match_score_matrix, extension_score, codon_score_matrix, false, edge_extension_end, codon_scoring_on
     )
     if do_clean_frameshifts
         result[1], result[2] = clean_frameshifts(result[1], result[2], verbose = verbose)

@@ -37,13 +37,13 @@ struct ScoringScheme
 	# substitution scoring:
 	# row and column indicies: 1=A, 2=C, 3=G, 4=T 
 	nucleotide_score_matrix::Matrix{Float64}
-	# only used in ref-query if match_codons=true in nw_align, seed_chain_align or msa_codon_align
+	# only used in ref-query if codon_scoring_on=true in nw_align, seed_chain_align or msa_codon_align
 	codon_score_matrix::Matrix{Float64}
 	# codon order: 1=F 2=L 3=S 4=Y 5=C 
 	#			   6=W 7=P 8=H 9=Q 10=R 
 	#              11=I 12=M 13=T 14=N 15=K
 	#              16=V 17=A 18=D 19=E 20=G
-	#              21="*" stop codon
+	# currently not supported: 21="*", stop codon 22="X" ambigious codon 
 	# based on the order of the genetic code
 
 	function ScoringScheme(extension_score::Float64, kmer_length::Int64, edge_ext_begin::Bool, edge_ext_end::Bool,

@@ -16,20 +16,20 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=STD_NOISY_MOVES
     # force no clean_up
     do_clean_frameshifts=false
     verbose=false
-    # force no match_codons
-    match_codons=false
+    # force no codon_scoring_on
+    codon_scoring_on=false
     # unpack arguments and call the internal alignment function
     nw_align(
         A, B, moveset.vert_moves, moveset.hor_moves, 
         scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_score_matrix,
-        scoring.edge_ext_begin, scoring.edge_ext_end, match_codons, do_clean_frameshifts, verbose
+        scoring.edge_ext_begin, scoring.edge_ext_end, codon_scoring_on, do_clean_frameshifts, verbose
     )
 end
 
 """ 
     
     nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING,
-        do_clean_frameshifts=false::Bool, verbose=false::Bool, match_codons=true::Bool)
+        do_clean_frameshifts=false::Bool, verbose=false::Bool, codon_scoring_on=true::Bool)
 
 Needleman_Wunsch wrapper - reference informed, i.e. assumes one of the sequence has intact reading frame. 
 
@@ -38,7 +38,7 @@ Optimally aligns a `query` sequence to a `ref` sequence using a codon-aware `Mov
 **NOTE** We always assume the readingFrame is 1
 """
 function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
-    do_clean_frameshifts=false::Bool, verbose=false::Bool, match_codons=true::Bool)
+    do_clean_frameshifts=false::Bool, verbose=false::Bool, codon_scoring_on=true::Bool)
 
     # check that moveset takes reference reading frame into account
     contains_ref_move(moveset) || throw(ArgumentError("Invalid Moveset for reference to query alignment!\n", 
@@ -48,14 +48,14 @@ function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_COD
     nw_align(
         ref, query, moveset.vert_moves, moveset.hor_moves, 
         scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_score_matrix,
-        scoring.edge_ext_begin, scoring.edge_ext_end, match_codons, do_clean_frameshifts, verbose
+        scoring.edge_ext_begin, scoring.edge_ext_end, codon_scoring_on, do_clean_frameshifts, verbose
     )
 end
 
 # Needleman Wunsch alignment with affine scoring (internal function)
 function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
     nuc_score_matrix::Matrix{Float64}, extension_score::Float64, codon_score_matrix::Matrix{Float64}=BLOSUM62, edge_extension_begin=false::Bool, 
-    edge_extension_end=false::Bool, match_codons=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y}
+    edge_extension_end=false::Bool, codon_scoring_on=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y}
     
     # throw exception if invalid alphabet in LongDNA{4}
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
@@ -103,7 +103,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
             top_sequence_pos = (column_index-column_offset)
             left_sequence_pos = (row_index-row_offset)
             # reward for matching codons if enabled
-            if match_codons && (top_sequence_pos) % 3 == 0
+            if codon_scoring_on && (top_sequence_pos) % 3 == 0
                 # performance optimized translation
                 ref_AA = fast_translate((A2[column_index-3],A2[column_index-2],A2[column_index-1]))
                 seq_AA = fast_translate((B2[row_index-3],B2[row_index-2],B2[row_index-1]))
@@ -253,7 +253,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
             match_Found = false
             if !must_move_hor && !must_move_ver
                 # reward for matching codons if enabled
-                if match_codons && (top_sequence_pos) % 3 == 0
+                if codon_scoring_on && (top_sequence_pos) % 3 == 0
                     ref_AA = fast_translate((A2[x-3],A2[x-2],A2[x-1]))
                     seq_AA = fast_translate((B2[y-3],B2[y-2],B2[y-1]))
                     # TODO handle stop codon more flexibly

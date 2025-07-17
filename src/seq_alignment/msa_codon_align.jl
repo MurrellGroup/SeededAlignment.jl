@@ -1,14 +1,14 @@
 """
     msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
-        match_codons=true::Bool, use_seeded=true::Bool)
+        codon_scoring_on=true::Bool, use_seeded=true::Bool)
 
 emm idk...
 """
 function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
-        match_codons=true::Bool, use_seeded=true::Bool)
+        codon_scoring_on=true::Bool, use_seeded=true::Bool)
     cleaned_codon_alignment = Vector{LongDNA{4}}(undef, length(seqs)+1)
     # perform pairwise seeded alignment for each sequence and clean indels which violate the reference readingFrame
-    cleaned_refs, cleaned_seqs = align_all_to_reference(ref, seqs, moveset, scoring, use_seeded = use_seeded, match_codons = match_codons, do_clean_frameshifts=true)
+    cleaned_refs, cleaned_seqs = align_all_to_reference(ref, seqs, moveset, scoring, use_seeded = use_seeded, codon_scoring_on = codon_scoring_on, do_clean_frameshifts=true)
     # resolve codon_insertion ambigiouity via left-stacking relative to reference
     msa = scaffold_msa_from_pairwise(cleaned_refs, cleaned_seqs)
     return msa
@@ -22,7 +22,7 @@ end
 """
 
 function align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::Moveset, score_params::ScoringScheme; 
-        use_seeded=true::Bool, match_codons=true::Bool,do_clean_frameshifts=true::Bool)
+        use_seeded=true::Bool, codon_scoring_on=true::Bool,do_clean_frameshifts=true::Bool)
 
     aligned_seqs = Vector{LongDNA{4}}(undef,length(seqs))
     aligned_refs = Vector{LongDNA{4}}(undef,length(seqs))
@@ -35,7 +35,7 @@ function align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moves
     # perform alignment for each sequence w.r.t. reference sequence
     for seqId in 1:length(seqs)
         aligned_ref, aligned_seq = seed_chain_align(ref = ref, query = ungap(seqs[seqId]), moveset=moveset, scoring=score_params, 
-            match_codons=match_codons, do_clean_frameshifts=do_clean_frameshifts) 
+            codon_scoring_on=codon_scoring_on, do_clean_frameshifts=do_clean_frameshifts) 
         # save entire alignment to clean up later
         aligned_seqs[seqId] = aligned_seq
         aligned_refs[seqId] = aligned_ref
