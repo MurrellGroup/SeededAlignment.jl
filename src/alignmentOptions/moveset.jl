@@ -9,7 +9,7 @@ struct Move
     function Move(ref::Bool,  step_length::Int64, score::Float64, extendable::Bool)
         (step_length in (1, 2, 3)) || throw(ArgumentError("step_length must be 1, 2, or 3"))
         (score < 0) || throw(ArgumentError("score must be negative"))
-        (!ref || (step_length == 3 && extendable)) || throw(ArgumentError("Invalid ref move:\n when ref=true it is required that step_length=3 and extendable=true."))
+        (!ref || (step_length == 3 && extendable)) || throw(ArgumentError("Invalid ref move:\nWhen ref=true it is required that step_length=3 and extendable=true."))
         new(ref, step_length, score, extendable)
     end
 end

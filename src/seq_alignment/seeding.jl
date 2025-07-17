@@ -42,10 +42,11 @@ function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::M
     vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, extension_score::Float64, k::Int64) where {X, Y}
     
     # Produce constants used for estimating scores without A and B
-    min_match_score = minimum(t -> match_score_matrix[t, t], 1 : 4)
-    gap_score_estimate = minimum(move -> move.score / move.step_length, (vgap_moves..., hgap_moves...))
-    if gap_score_estimate > extension_score >= 0
-        gap_score_estimate = (gap_score_estimate + 2 * extension_score) / 3 # approx_gap_score undefined, replaced with gap_score_estimate
+    min_match_score = maximum(t -> match_score_matrix[t, t], 1 : 4)
+    gap_score_estimate = maximum(move -> move.score / move.step_length, (vgap_moves..., hgap_moves...))
+    # if gap_score_estimate less than extension_score we take an average
+    if gap_score_estimate < extension_score
+        gap_score_estimate = (gap_score_estimate + 2 * extension_score) / 3
     end
     gap_score_estimate -= min_match_score/2
     match_score_estimate = sum(match_score_matrix) / 16 - min_match_score
@@ -120,7 +121,7 @@ function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::M
                 if t != 0
                     candidate = chains[j][t]
                     score = getConnectionScore(kmerMatches[candidate], KmerMatch(e.x, e.y), k, gap_score_estimate, match_score_estimate) + bestScores[candidate]
-                    if score < bestScores[e.id]
+                    if score > bestScores[e.id]
                         bestScores[e.id] = score
                         bestConnections[e.id] = candidate
                     end
@@ -136,7 +137,7 @@ function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::M
     #Back propagation
     kmerPath = Vector{KmerMatch}() #Final kmer choice
     if matchCount > 0
-        kmer = argmin([bestScores[i] + getConnectionScore(kmerMatches[i], KmerMatch(m, n), k, gap_score_estimate, match_score_estimate) for i in 1 : matchCount])
+        kmer = argmax([bestScores[i] + getConnectionScore(kmerMatches[i], KmerMatch(m, n), k, gap_score_estimate, match_score_estimate) for i in 1 : matchCount])
         while true
             push!(kmerPath, kmerMatches[kmer])
             if bestConnections[kmer] == kmer

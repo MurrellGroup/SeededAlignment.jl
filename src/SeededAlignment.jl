@@ -24,8 +24,10 @@ export
     msa_codon_align, seed_chain_align, nw_align,
     # Remove frameshift mutations/noise from a Pairwise Codon Alignment
     clean_frameshifts,
-    # Alignment Options types
-    Moveset, ScoringScheme, Move,
+    # Alignment scoring options
+    ScoringScheme,
+    # Alignment operation/movement options
+    Moveset, Move, RefMove, FrameshiftMove,
     # utilities
     read_fasta, write_fasta
 end

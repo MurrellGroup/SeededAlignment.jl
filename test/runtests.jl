@@ -44,8 +44,6 @@ using Random
         @testset "1.4 type inferrence" begin
             @test typeof(@inferred nw_align(A,B)) == Tuple{LongDNA{4},LongDNA{4}}
         end
-
-        
     end
 
     @testset "2. ref alignment nw_affine" begin

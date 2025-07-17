@@ -41,9 +41,9 @@ function seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset
     codon_scoring_on=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool)
 
     # check that moveset takes reference reading frame into account
-    contains_ref_move(moveset) || throw(ArgumentError("Invalid Moveset for reference to query alignment!\n", 
-                                        "At least one Move in Moveset must consider reference reading (Move.ref=true)",
-                                        " - in other words codon insertions or deletions must be allowed."))
+    contains_ref_move(moveset) || throw(ArgumentError("Invalid Moveset for reference to query alignment!\n
+                                        At least one Move in Moveset must consider reference reading (Move.ref=true)
+                                         - in other words codon insertions or deletions must be allowed."))
     # unpack arguments and call the internal alignment function
     seed_chain_align(
         ref, query, moveset.vert_moves, moveset.hor_moves,
