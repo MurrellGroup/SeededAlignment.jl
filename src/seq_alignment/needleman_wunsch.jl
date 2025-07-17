@@ -62,13 +62,6 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), B) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
 
     n, m = length(A), length(B)
-    # Do non-affine NW
-    if !(extension_score > 0)
-        println("non-affine mode")
-        extension_score = Inf64
-        edge_ext_begin = false
-        edge_ext_end = false
-    end
 
     # Offset indicies to avoid bounds-checking
     column_offset = maximum(k -> k.step_length, hgap_moves) + 1
@@ -82,14 +75,14 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
 
     # Initialize DP matrix
     # The cell at [x + row_offset, y + column_offset] is the score of the best alignment of A[1 : x] with B[1 : y]
-    dp_matrix = fill(Inf64, row_boundary, column_boundary)
+    dp_matrix = fill(-Inf64, row_boundary, column_boundary)
 
     # Assign score 0 to the empty alignment
     dp_matrix[row_offset, column_offset] = 0.0
 
     # Affine moves requires two extra DP matrices
-    vaffine_matrix = fill(Inf64, row_boundary, column_boundary)
-    haffine_matrix = fill(Inf64, row_boundary, column_boundary)
+    vaffine_matrix = fill(-Inf64, row_boundary, column_boundary)
+    haffine_matrix = fill(-Inf64, row_boundary, column_boundary)
     
     # allow starting in extending
     if edge_extension_begin
@@ -115,7 +108,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
                     match_score = sum(t -> nuc_score_matrix[toInt(A2[column_index - t]), toInt(B2[row_index - t])], 1 : 3)
                     match_score += codon_match_score
                     # update dp_matrix
-                    dp_matrix[row_index, column_index] = min(
+                    dp_matrix[row_index, column_index] = max(
                         dp_matrix[row_index, column_index],
                         dp_matrix[row_index-3,column_index-3]+match_score
                     ) 
@@ -124,7 +117,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
 
             # check score if match current pair of nucleotides
             match_score = nuc_score_matrix[toInt(A2[column_index - 1]), toInt(B2[row_index - 1])]
-            dp_matrix[row_index, column_index] = min(
+            dp_matrix[row_index, column_index] = max(
                 dp_matrix[row_index, column_index], 
                 dp_matrix[row_index-1,column_index-1]+match_score
             )
@@ -133,13 +126,13 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
             for k ∈ vgap_moves
                 if !k.ref || (top_sequence_pos) % 3 == 0
                     if k.extendable
-                        vaffine_matrix[row_index, column_index] = min(
+                        vaffine_matrix[row_index, column_index] = max(
                             vaffine_matrix[row_index, column_index],
                             vaffine_matrix[row_index - k.step_length, column_index] + extension_score * k.step_length,
                             dp_matrix[row_index - k.step_length, column_index] + k.score
                         )
                     else
-                        dp_matrix[row_index,column_index] = min(
+                        dp_matrix[row_index,column_index] = max(
                             dp_matrix[row_index,column_index],
                             dp_matrix[row_index - k.step_length, column_index] + k.score
                         )
@@ -151,13 +144,13 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
             for k ∈ hgap_moves
                 if !k.ref || (top_sequence_pos-k.step_length) % 3 == 0
                     if k.extendable
-                        haffine_matrix[row_index, column_index] = min(
+                        haffine_matrix[row_index, column_index] = max(
                             haffine_matrix[row_index, column_index],
                             haffine_matrix[row_index, column_index - k.step_length] + extension_score * k.step_length,
                             dp_matrix[row_index, column_index - k.step_length] + k.score
                         )
                     else
-                        dp_matrix[row_index,column_index] = min(
+                        dp_matrix[row_index,column_index] = max(
                             dp_matrix[row_index,column_index],
                             dp_matrix[row_index, column_index - k.step_length] + k.score
                         )
@@ -166,7 +159,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
             end
 
             # find overall best move
-            dp_matrix[row_index, column_index] = min(
+            dp_matrix[row_index, column_index] = max(
                 dp_matrix[row_index, column_index], 
                 haffine_matrix[row_index, column_index],
                 vaffine_matrix[row_index, column_index]
@@ -177,19 +170,19 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
     # handle ending alignment in extension state if enabled
     if edge_extension_end
         for row_index in row_offset : row_boundary
-            vaffine_matrix[row_boundary,column_boundary] = min(
+            vaffine_matrix[row_boundary,column_boundary] = max(
                 vaffine_matrix[row_boundary,column_boundary],  
                 dp_matrix[row_index,column_boundary] + extension_score*(row_boundary-row_index)
             )
         end
         for column_index in column_offset : column_boundary
-            haffine_matrix[row_boundary,column_boundary] = min(
+            haffine_matrix[row_boundary,column_boundary] = max(
                 haffine_matrix[row_boundary, column_boundary],
                 dp_matrix[row_boundary,column_index] + extension_score*(column_boundary-column_index)
             )
         end
         # update end score
-        dp_matrix[row_boundary, column_boundary] = min(
+        dp_matrix[row_boundary, column_boundary] = max(
             dp_matrix[row_boundary, column_boundary], 
             haffine_matrix[row_boundary, column_boundary],
             vaffine_matrix[row_boundary, column_boundary]
@@ -251,7 +244,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
 
             # iterate through digonal match moves
             match_Found = false
-            if !must_move_hor && !must_move_ver
+            if !must_move_hor && !must_move_ver # TODO check if we ever get out of index range here
                 # reward for matching codons if enabled
                 if codon_scoring_on && (top_sequence_pos) % 3 == 0
                     ref_AA = fast_translate((A2[x-3],A2[x-2],A2[x-1]))

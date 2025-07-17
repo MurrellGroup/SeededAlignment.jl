@@ -48,12 +48,16 @@ struct ScoringScheme
 
 	function ScoringScheme(extension_score::Float64, kmer_length::Int64, edge_ext_begin::Bool, edge_ext_end::Bool,
 		nucleotide_score_matrix::Matrix{Float64}, codon_score_matrix::Matrix{Float64})
-		# TODO add construction invariants
-
+		(extension_score < 0) || throw(ArgumentError("extension_score must be negative"))
+		(kmer_length > 0) || throw(ArgumentError("kmer_length must be positive integer"))
+		# TODO set upper and lower limit on kmer_size also about codons
+		# TODO add some sort of restriction on scoring matricies. Like matching better than mismatching and not negative
+		
 		new(extension_score::Float64, kmer_length::Int64, edge_ext_begin::Bool, edge_ext_end::Bool,
 			nucleotide_score_matrix::Matrix{Float64}, codon_score_matrix::Matrix{Float64})
 	end
 end
+# TODO definitively need a match/mismatch constructor version because that's easier for people to configure than 20x20 matrix or 4x4
 
 # ScoringScheme construction wrapper # TODO handle stop codon
 function ScoringScheme(; extension_score::Float64=0.4, kmer_length::Int64=18, edge_ext_begin=true::Bool, edge_ext_end=true::Bool, 
@@ -106,7 +110,7 @@ Use this as a default `ScoringScheme` for codon-preserving alignments.
 """
 # TODO handle stop codon
 const STD_SCORING = ScoringScheme(
-	extension_score=0.4,
+	extension_score=-3.0,
 	kmer_length=18,
 	edge_ext_begin=true,
 	edge_ext_end=true,

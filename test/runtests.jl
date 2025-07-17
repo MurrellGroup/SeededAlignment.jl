@@ -5,8 +5,6 @@ using SeededAlignment
 using BioSequences
 using Random
 
-# TODO compare fast_translate to BioSequences.translate
-
 @testset "SeededAlignment.jl" begin
     @testset "1. noisy alignment nw_affine" begin
         Random.seed!(42)
@@ -21,19 +19,17 @@ using Random
         @testset "1.2 aligned_sequences have the same length" begin
 	        @test length(aligned_A) == length(aligned_B)
         end
-        # 1.3 start and ending extension - test broken for now
-        """
+        # 1.3 start and ending extension
         @testset "1.3 start and ending extension" begin
             C = LongDNA{4}("TTTAAAGGG")
             D = LongDNA{4}("AAAGGGCCC")
             # we test if we get different alignments from tweaking the boolean parameters
-            score_params_on =  ScoringScheme(extension_score=0.4, edge_ext_begin=true,edge_ext_end=true)
-            score_params_off = ScoringScheme(extension_score=0.4, edge_ext_begin=false,edge_ext_end=false)
+            score_params_on =  ScoringScheme(extension_score=-0.4, edge_ext_begin=true, edge_ext_end=true)
+            score_params_off = ScoringScheme(extension_score=-0.4, edge_ext_begin=false,edge_ext_end=false)
             move_set = Moveset(
                 ref_insertions = (Move(ref=false, step_length=3, score=-40.0, extendable=true),),
                 ref_deletions  = (Move(ref=false, step_length=3, score=-40.0, extendable=true),)
             )
-            
             # test start and end extension on
             alignment = nw_align(C,D,moveset = move_set,scoring = score_params_on)
             @test alignment[1] == LongDNA{4}("TTTAAAGGG---")
@@ -44,7 +40,6 @@ using Random
             @test alignment[1] == LongDNA{4}("TTTAAAGGG")
             @test alignment[2] == LongDNA{4}("AAAGGGCCC")
         end
-        """
         # 1.4 type inferrence
         @testset "1.4 type inferrence" begin
             @test typeof(@inferred nw_align(A,B)) == Tuple{LongDNA{4},LongDNA{4}}
@@ -55,17 +50,31 @@ using Random
 
     @testset "2. ref alignment nw_affine" begin
         move_set = Moveset(
-                ref_insertions = (Move(ref=true, step_length=3, score=2.0, extendable=true),),
-                ref_deletions =  (Move(ref=true, step_length=3, score=2.0, extendable=true),)
+                ref_insertions = (Move(ref=true, step_length=3, score=-10.0, extendable=true),),
+                ref_deletions =  (Move(ref=true, step_length=3, score=-10.0, extendable=true),)
             )
         Random.seed!(42)
-        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 198)
-        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 228)
+        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 33)
+        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 42)
         # reference informed alignment
-        aligned_A, aligned_B = nw_align(ref = A, query = B, moveset=move_set, do_clean_frameshifts=true)
-        # 2.1 indels don't break codon readingframe
+        aligned_A, aligned_B = nw_align(ref = A, query = B, moveset=move_set)
+        # 2.1 alignment doesn't alter the underlying sequences
+        @testset "2.1 alignment doesn't alter the underlying sequences" begin
+            @test ungap(aligned_A) == A && ungap(aligned_B) == B
+        end
+        # 2.2 aligned_sequences have the same length
+        @testset "2.2 aligned_sequences have the same length" begin
+	        @test length(aligned_A) == length(aligned_B)
+        end
+        # 2.3 indels don't break codon readingframe
+        @testset "2.3 indels don't break codon readingframe" begin
+        # extension at edges turned off
+        # reference informed alignment
+        aligned_A, aligned_B = nw_align(ref = A, query = B, moveset=move_set)
+        # check if any clean up was needed
         @test ungap(aligned_A) == A
         @test ungap(aligned_B) == B
+        end 
     end
 
     @testset "3. noisy alignment seed_chain_align" begin 
@@ -90,17 +99,31 @@ using Random
 
     @testset "4. ref alignment seed_chain_align" begin
         move_set = Moveset(
-                ref_insertions = (Move(ref=true, step_length=3, score=2.0, extendable=true),),
-                ref_deletions =(Move(ref=true, step_length=3, score=2.0, extendable=true),)
+                ref_insertions = (Move(ref=true, step_length=3, score=-10.0, extendable=true),),
+                ref_deletions =  (Move(ref=true, step_length=3, score=-10.0, extendable=true),)
             )
         Random.seed!(42)
-        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 198)
-        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 228)
+        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 33)
+        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 42)
         # reference informed alignment
-        aligned_A, aligned_B = seed_chain_align(ref = A, query = B, moveset=move_set, do_clean_frameshifts=true)
-        # 4.1 indels don't break codon readingframe
+        aligned_A, aligned_B = seed_chain_align(ref = A, query = B, moveset=move_set)
+        # 4.1 alignment doesn't alter the underlying sequences
+        @testset "4.1 alignment doesn't alter the underlying sequences" begin
+            @test ungap(aligned_A) == A && ungap(aligned_B) == B
+        end
+        # 4.2 aligned_sequences have the same length
+        @testset "4.2 aligned_sequences have the same length" begin
+	        @test length(aligned_A) == length(aligned_B)
+        end
+        # 4.3 indels don't break codon readingframe
+        @testset "4.3 indels don't break codon readingframe" begin
+        # extension at edges turned off
+        # reference informed alignment
+        aligned_A, aligned_B = seed_chain_align(ref = A, query = B, moveset=move_set)
+        # check if any clean up was needed
         @test ungap(aligned_A) == A
         @test ungap(aligned_B) == B
+        end 
     end
 
     @testset "5. msa_codon_align" begin
