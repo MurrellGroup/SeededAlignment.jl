@@ -29,8 +29,8 @@ using Random
             score_params_on = ScoringScheme(match_score=0.0, mismatch_score=0.5, extension_score=0.4, edge_ext_begin=true,edge_ext_end=true)
             score_params_off = ScoringScheme(match_score=0.0, mismatch_score=0.5, extension_score=0.4, edge_ext_begin=false,edge_ext_end=false)
             move_set = Moveset(
-                hor_moves = (Move(ref=false, step_length=3, score=30.0, extendable=true),),
-                vert_moves = (Move(ref=false, step_length=3, score=30.0, extendable=true),)
+                ref_insertions = (Move(ref=false, step_length=3, score=30.0, extendable=true),),
+                ref_deletions  = (Move(ref=false, step_length=3, score=30.0, extendable=true),)
             )
             
             # test start and end extension on
@@ -53,8 +53,8 @@ using Random
 
     @testset "2. ref alignment nw_affine" begin
         move_set = Moveset(
-                hor_moves = (Move(ref=true, step_length=3, score=2.0, extendable=true),),
-                vert_moves =(Move(ref=true, step_length=3, score=2.0, extendable=true),)
+                ref_insertions = (Move(ref=true, step_length=3, score=2.0, extendable=true),),
+                ref_deletions =  (Move(ref=true, step_length=3, score=2.0, extendable=true),)
             )
         Random.seed!(42)
         A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 198)
@@ -88,14 +88,14 @@ using Random
 
     @testset "4. ref alignment seed_chain_align" begin
         move_set = Moveset(
-                hor_moves = (Move(ref=true, step_length=3, score=2.0, extendable=true),),
-                vert_moves =(Move(ref=true, step_length=3, score=2.0, extendable=true),)
+                ref_insertions = (Move(ref=true, step_length=3, score=2.0, extendable=true),),
+                ref_deletions =(Move(ref=true, step_length=3, score=2.0, extendable=true),)
             )
         Random.seed!(42)
         A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 198)
         B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 228)
         # reference informed alignment
-        aligned_A, aligned_B = seed_chain_align(ref = A, query = B, moveset=move_set, do_clean_frameshifts=true, verbose=true)
+        aligned_A, aligned_B = seed_chain_align(ref = A, query = B, moveset=move_set, do_clean_frameshifts=true)
         # 4.1 indels don't break codon readingframe
         @test ungap(aligned_A) == A
         @test ungap(aligned_B) == B

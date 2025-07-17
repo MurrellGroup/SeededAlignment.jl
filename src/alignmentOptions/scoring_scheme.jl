@@ -35,7 +35,13 @@ struct ScoringScheme
 	edge_ext_end::Bool
 	# (opt arg) if match_codons in aligner function
 	# TODO replace with codon scoring matrix
-	codon_match_bonus::Float64
+	# codon order: 1=F 2=L 3=S 4=Y 5=C 
+	#			   6=W 7=P 8=H 9=Q 10=R 
+	#              11=I 12=M 13=T 14=N 15=K
+	#              16=V 17=A 18=D 19=E 20=G
+	# based on the order of the genetic code
+	#codon_score_matrix::Matrix{Float64}
+	codon_match_bonus::Float64 # TODO add large stop codon penalty
 	# (opt arg) if seeding
 	kmerlength::Int64
 	

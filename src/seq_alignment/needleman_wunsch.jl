@@ -9,6 +9,7 @@ with respect to the `Moveset` and the `ScoringScheme`.
 
 """
 function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=std_noisy_moveset(), scoring::ScoringScheme=std_scoring())
+    !contains_ref_move(moveset) || throw(ArgumentError("moveset contains move(s) that consider "))
     # force no clean_up
     do_clean_frameshifts=false
     verbose=false
@@ -36,7 +37,10 @@ Optimally aligns a `query` sequence to a `ref` sequence using a codon-aware `Mov
 function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=std_codon_moveset(), scoring::ScoringScheme=std_scoring(), 
     do_clean_frameshifts=false::Bool, verbose=false::Bool, match_codons=true::Bool)
 
-    # TODO confirm we have ref move...
+    # check that moveset takes reference reading frame into account
+    contains_ref_move(moveset) || throw(ArgumentError("Invalid Moveset for reference to query alignment!\n", 
+                                        "At least one Move in Moveset must consider reference reading (Move.ref=true)",
+                                        " - in other words codon insertions or deletions must be allowed."))
 
     # unpack arguments and call the internal alignment function
     nw_align(
