@@ -75,7 +75,8 @@ using Random
         end 
     end
 
-    @testset "3. noisy alignment seed_chain_align" begin 
+    @testset "3. noisy alignment seed_chain_align" begin
+        # TODO better to use more similar sequences so it finds more kmers
         Random.seed!(42)
         A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1001)
         B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 980)
@@ -100,7 +101,7 @@ using Random
                 ref_insertions = (Move(ref=true, step_length=3, score=-10.0, extendable=true),),
                 ref_deletions =  (Move(ref=true, step_length=3, score=-10.0, extendable=true),)
             )
-        Random.seed!(42)
+        Random.seed!(42) # TODO better to use more similar sequences so it finds more kmers
         A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 33)
         B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 42)
         # reference informed alignment
