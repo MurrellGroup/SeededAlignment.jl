@@ -6,7 +6,7 @@ emm idk...
 """
 function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
         codon_scoring_on=true::Bool, use_seeded=true::Bool)
-    cleaned_codon_alignment = Vector{LongDNA{4}}(undef, length(seqs)+1)
+
     # perform pairwise seeded alignment for each sequence and clean indels which violate the reference readingFrame
     cleaned_refs, cleaned_seqs = align_all_to_reference(ref, seqs, moveset, scoring, use_seeded = use_seeded, codon_scoring_on = codon_scoring_on, do_clean_frameshifts=true)
     # resolve codon_insertion ambigiouity via left-stacking relative to reference
@@ -22,7 +22,7 @@ end
 """
 
 function align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::Moveset, score_params::ScoringScheme; 
-        use_seeded=true::Bool, codon_scoring_on=true::Bool,do_clean_frameshifts=true::Bool)
+        use_seeded=true::Bool, codon_scoring_on=true::Bool, do_clean_frameshifts=true::Bool)
 
     aligned_seqs = Vector{LongDNA{4}}(undef,length(seqs))
     aligned_refs = Vector{LongDNA{4}}(undef,length(seqs))
@@ -34,7 +34,7 @@ function align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moves
     end
     # perform alignment for each sequence w.r.t. reference sequence
     for seqId in 1:length(seqs)
-        aligned_ref, aligned_seq = seed_chain_align(ref = ref, query = ungap(seqs[seqId]), moveset=moveset, scoring=score_params, 
+        aligned_ref, aligned_seq = align(ref = ref, query = seqs[seqId], moveset=moveset, scoring=score_params, 
             codon_scoring_on=codon_scoring_on, do_clean_frameshifts=do_clean_frameshifts) 
         # save entire alignment to clean up later
         aligned_seqs[seqId] = aligned_seq
@@ -87,10 +87,11 @@ end
 
 # TODO implement the speedup version of this
 function scaffold_msa_from_pairwise(cleaned_refs::Vector{LongDNA{4}}, cleaned_seqs::Vector{LongDNA{4}})
-    # NOTE: we assume that 
+    
     ref = ungap(cleaned_refs[1])
-    # TODO test if slight differences between cleaned_refs might still work
+    # NOTE: we assume that all cleaned_refs represent the same sequence
     #!any(ref != ungap(cleaned_refs[i]) for i in 2:length(cleaned_refs)) || throw(ArgumentError(""))
+    
     # bookkeeping variables
     n_seqs = length(cleaned_seqs)
     ref_insert_addon = 0
@@ -107,7 +108,11 @@ function scaffold_msa_from_pairwise(cleaned_refs::Vector{LongDNA{4}}, cleaned_se
     cleaned_codon_alignment[1] = ref
 
     # visually fix the codon insertions by that we left-stack codon insertions at each insertion intervall.
-    for codon_index in 1:(codon_length+1) # TODO this can be speedup by always concatenating insertions at the end of sequences.
+    for codon_index in 1:(codon_length+1) 
+        
+        # TODO this can be speedup by avoiding concatenation and using push! or append! instead.
+        # TODO ALTERNATIVELY try copyto! still probably slower
+
         # check for insertions that end at the codon_index:th codon relativ to reference
         longest_insert = maximum(insertion_bookeeping_matrix[:,codon_index])
         if longest_insert > 0

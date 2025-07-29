@@ -158,11 +158,14 @@ using Random
             aligned_seq1 = LongDNA{4}("ATGTTTTTTCCCGGGTAA")
             aligned_ref2 = LongDNA{4}("---ATG---TTTCCCGGGTAA---")
             aligned_seq2 = LongDNA{4}("ATGATGTTTTTTCCCGGGTAAGGG")
-            msa = SeededAlignment.scaffold_msa_from_pairwise([aligned_ref1,aligned_ref2], [aligned_seq1,aligned_seq2])
+            aligned_ref3 = LongDNA{4}("ATGTTTCCCGGGTAA")
+            aligned_seq3 = LongDNA{4}("ATG---CCCGGG---")
+            msa = SeededAlignment.scaffold_msa_from_pairwise([aligned_ref1,aligned_ref2,aligned_ref3], [aligned_seq1,aligned_seq2,aligned_seq3])
             # compare with expected scaffolded msa
             @test msa[1] == LongDNA{4}("---ATG---TTTCCCGGGTAA---")
             @test msa[2] == LongDNA{4}("---ATGTTTTTTCCCGGGTAA---")
             @test msa[3] == LongDNA{4}("ATGATGTTTTTTCCCGGGTAAGGG")
+            @test msa[4] == LongDNA{4}("---ATG------CCCGGG------")
         end
     end
     

@@ -42,7 +42,7 @@ end
 Moveset(gap_moves) = Moveset(gap_moves, gap_moves)
 
 function show(io::IO, ms::Moveset)
-	println(io, "Moveset(\n","vert_moves=$(ms.vert_moves)\n)","hor_moves=$(ms.hor_moves)\n)")
+	println(io, "Moveset(\n","  vert_moves=$(ms.vert_moves)\n","  hor_moves=$(ms.hor_moves)\n)")
 end
 
 function contains_ref_move(moveset::Moveset)

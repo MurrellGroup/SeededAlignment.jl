@@ -28,6 +28,8 @@ export
     ScoringScheme,
     # Alignment operation/movement options
     Moveset, Move, RefMove, FrameshiftMove,
+    # default constant alignment options.
+    STD_CODON_MOVESET, STD_NOISY_MOVESET, STD_SCORING,
     # utilities
     read_fasta, write_fasta
 end

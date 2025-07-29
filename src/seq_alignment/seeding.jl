@@ -152,7 +152,6 @@ function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::M
     return kmerPath
 end
 
-
 #Kmer selection variant algorithm (unused currently) will be compared in benchmark
 function select_max_correlation_kmer_path(kmerMatches)
 

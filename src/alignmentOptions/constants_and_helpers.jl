@@ -5,6 +5,8 @@ const AA_STANDARD_ORDER = AminoAcid.([
     '*'
 ])
 
+# TODO replace with generation via bitmask
+# NOTE important that they stay AminoAcid type to work with BioSequences.compatbits
 const CODON_TABLE::Vector{AminoAcid} = AminoAcid[
     # AAA AAC AAG AAT
     AminoAcid('K'), AminoAcid('N'), AminoAcid('K'), AminoAcid('N'),

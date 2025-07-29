@@ -78,13 +78,10 @@ end
 import Base: show
 function show(io::IO, s::ScoringScheme)
 	print(io, "ScoringScheme(",
-			  "match=$(s.match_score), ",
-			  "mismatch=$(s.mismatch_score), ",
 			  "extension=$(s.extension_score), ",
 			  "begin_ext=$(s.edge_ext_begin), ",
 			  "end_ext=$(s.edge_ext_end), ",
-			  "codon_match_bonus=$(s.codon_match_bonus), ",
-			  "kmer=$(s.kmerlength))")
+			  "kmer_length=$(s.kmer_length))")
 end
 
 # matrix constructor helper method

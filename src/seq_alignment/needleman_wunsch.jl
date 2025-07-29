@@ -53,7 +53,9 @@ function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_COD
 end
 
 # Needleman Wunsch alignment with affine scoring (internal function)
-function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
+# FIXME check how to handle cases where no valid alignment exists... 
+# @inbounds I don't get why that doesn't give speedup need to test in script
+@fastmath function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
     nuc_score_matrix::Matrix{Float64}, extension_score::Float64, codon_score_matrix::Matrix{Float64}=BLOSUM62, edge_extension_begin=false::Bool, 
     edge_extension_end=false::Bool, codon_scoring_on=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y}
     
@@ -210,6 +212,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap
             push!(res_B, DNA_Gap)
             x -= 1
         else
+            # TODO move edge extension boundary from main backtrack for speedup
             # end extension backtrack
             if x == column_boundary && edge_extension_end
                 for i in 1:y-row_offset
