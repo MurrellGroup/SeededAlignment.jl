@@ -70,7 +70,7 @@ function get_non_stop_codons()
         end
         codons[bitmask+1] = new_codon
     end
-    non_stop_codons = filter!(x -> (translate(x) != LongAA('*')), codons)
+    non_stop_codons = filter!(x -> (BioSequences.translate(x) != LongAA('*')), codons)
     return non_stop_codons
 end
 
@@ -81,6 +81,15 @@ function generate_random_ref(num_codons::Int64)
         append!(ref, new_codon)
     end
     return ref
+end
+
+#FIXME ruins the msa...
+function anonymize_msa!(msa::Vector{LongDNA{4}})
+    # TODO this doesn't quite work hmm...
+    n = length(msa)
+    for i in 1:n
+        anonymize_CDS!(msa[i])
+    end
 end
 
 function anonymize_CDS!(CDS::LongDNA{4})

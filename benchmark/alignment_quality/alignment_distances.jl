@@ -1,4 +1,3 @@
-# TODO test the function works
 function levenshtein(seq1::BioSequence{T}, seq2::BioSequence{T}) where T<:Alphabet
     len1 = length(seq1)
     len2 = length(seq2)
@@ -30,12 +29,14 @@ end
 function SP_score(target_alignment::Tuple{BioSequence{T},BioSequence{T}}, src_alignment::Tuple{BioSequence{T},BioSequence{T}}) where T<:Alphabet
     @assert length(target_alignment[1]) == length(src_alignment[1]) # FIXME handle case where different lengths if it arises enough
     seqlen = length(target_alignment[1])
-    display_offset = 10
+    display_offset = 40
     matches = 0
+    last_err_index = -display_offset
     for j in 1:seqlen
         if target_alignment[1][j] == src_alignment[1][j] && target_alignment[2][j] == src_alignment[2][j]
             matches += 1
-        else
+        elseif j-last_err_index > display_offset
+            last_err_index = j
             println("alignment_index: ", j)
             if j-display_offset > 0 && seqlen > j+display_offset
                 println("target alignment:\n",target_alignment[1][j-display_offset:j+display_offset],"\n",target_alignment[2][j-display_offset:j+display_offset])
@@ -51,14 +52,3 @@ function SP_score(target_alignment::Tuple{BioSequence{T},BioSequence{T}}, src_al
     end
     return (matches/seqlen)
 end
-
-#= implement these on msa_level
-function SP_score()
-    seqlen = length()
-end
-
-function TC_score()
-
-end
-
-=#
