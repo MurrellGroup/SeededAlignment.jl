@@ -115,7 +115,7 @@ Use this as a default `ScoringScheme` for codon-preserving alignments.
 # TODO handle stop codon
 const STD_SCORING = ScoringScheme(
 	extension_score=-3.0,
-	kmer_length=18,
+	kmer_length=15,
 	edge_ext_begin=true,
 	edge_ext_end=true,
 	nucleotide_score_matrix=NUC_MATRIX,

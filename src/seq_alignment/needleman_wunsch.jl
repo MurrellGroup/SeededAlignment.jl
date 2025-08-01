@@ -19,7 +19,7 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=STD_NOISY_MOVES
     # force no codon_scoring_on
     codon_scoring_on=false
     # unpack arguments and call the internal alignment function
-    nw_align(
+    _nw_align(
         A, B, moveset.vert_moves, moveset.hor_moves, 
         scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_score_matrix,
         scoring.edge_ext_begin, scoring.edge_ext_end, codon_scoring_on, do_clean_frameshifts, verbose
@@ -45,7 +45,7 @@ function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_COD
                                         "At least one Move in Moveset must consider reference reading (Move.ref=true)",
                                         " - in other words codon insertions or deletions must be allowed."))
     # unpack arguments and call the internal alignment function
-    nw_align(
+    _nw_align(
         ref, query, moveset.vert_moves, moveset.hor_moves, 
         scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_score_matrix,
         scoring.edge_ext_begin, scoring.edge_ext_end, codon_scoring_on, do_clean_frameshifts, verbose
@@ -55,7 +55,7 @@ end
 # Needleman Wunsch alignment with affine scoring (internal function)
 # FIXME check how to handle cases where no valid alignment exists... 
 # @inbounds I don't get why that doesn't give speedup need to test in script
-@fastmath function nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
+@fastmath function _nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
     nuc_score_matrix::Matrix{Float64}, extension_score::Float64, codon_score_matrix::Matrix{Float64}=BLOSUM62, edge_extension_begin=false::Bool, 
     edge_extension_end=false::Bool, codon_scoring_on=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y}
     

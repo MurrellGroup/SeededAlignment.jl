@@ -28,6 +28,7 @@ two alignments if possible.
 seed_chain_align respectively. We attempt to compute the SP_score and TC_score for each of the alignments. 
 (TODO: For our TC_scoring we assume that both alignments have the same lengths which isn't might break the scoring in rare cases).
 =#
+
 using Plots
 using BioSequences
 # include noising methods
@@ -68,7 +69,7 @@ num_seqs = length(seqs)
 AA_seqs = LongAA[BioSequences.translate(seqs[i]) for i in 1:num_seqs]
 # noise the sequences bad noise
 noised_seqs = LongDNA{4}[frameshift_noise_seq!(seqs[i]) for i in 1:num_seqs]
-msa = msa_codon_align(ref, noised_seqs)
+msa = msa_codon_align(ref, noised_seqs, codon_scoring_on=true)
 write_fasta(".fasta_output/msa_problem.fasta", msa)
 noised_AA_seqs = LongAA[BioSequences.translate(ungap(msa[i+1])) for i in 1:num_seqs]
 levenshtein_distances = Int64[levenshtein(noised_AA_seqs[i], AA_seqs[i]) for i in 1:num_seqs]
@@ -77,7 +78,7 @@ hist = histogram(levenshtein_distances, bins=5, xlabel="AA_levenshtein_distance"
 display(hist)
 savefig("seed_histogram.png")
 # show differences 
-# TODO we get bad results sometimes... investigate if this is just because the noise is badly done or something deeper
+# TODO 1 or 2 sequences get werid result. Investigate if due to frameshift in dataset 
 for i in 1:num_seqs
     cur_denoised = noised_AA_seqs[i]
     cur_ref = AA_seqs[i]
@@ -85,6 +86,7 @@ for i in 1:num_seqs
     for j in 1:length(cur_ref)
         if cur_ref[j] != cur_denoised[j] && (cur_denoised[j] != AminoAcid('X'))
             println("seqId: ",i)
+            println("codon_index: ", j)
             if j-5 > 0 && length(AA_seqs[i]) > j+5
                 println("noise_corrected: ",cur_denoised[j-5:j+5])
                 println("no noise:        ", cur_ref[j-5:j+5])
@@ -99,17 +101,26 @@ for i in 1:num_seqs
     end 
 end
 
+seq = noised_seqs[18]
+target_alignment = nw_align(ref=ref, query=seq, do_clean_frameshifts=true)
+src_alignment = seed_chain_align(ref=ref, query=seq, do_clean_frameshifts=true)
+write_fasta(".fasta_output/pairwise_comparison.fasta", (target_alignment..., src_alignment...))
 #= 2. How well does seed_chain_align recover the "true alignment" on a nucleotide level? (EXTRA)
 ________________________________________________________________________________________________________________=#
+# TODO optional method to check percentage match_sequences. Will be kinda slow. 
 
 #collect sequnces and ungap sequence 
 names, ref_and_seqs = read_fasta(".fasta_input/P018_subset.fasta")
+rng = RandomDevice()
+idx = rand(rng, 2:num_seqs)
+println(idx)
 ref = ungap(ref_and_seqs[1])
-seq = ungap(ref_and_seqs[end])
+seq = ungap(ref_and_seqs[idx])
+frameshift_noise_seq!(seq)
 # TODO add seeds only comparison. 
-target_alignment = nw_align(ref=ref, query=seq)
-src_alignment = seed_chain_align(ref=ref, query=seq)
-write_fasta(".fasta_output/pairwise_comparison.fasta", (target_alignment..., src_alignment...))
+target_alignment = nw_align(ref=ref, query=seq, do_clean_frameshifts=true)
+src_alignment = seed_chain_align(ref=ref, query=seq, do_clean_frameshifts=true)
+#write_fasta(".fasta_output/pairwise_comparison.fasta", (target_alignment..., src_alignment...))
 try
     # translate to protein alignment
     prot_target_alignment = translate_aligned_nuc_seq.(target_alignment)
@@ -117,9 +128,8 @@ try
     # get nucleotide and protein SP_score
     nuc_matched_percentage = SP_score(target_alignment, src_alignment)
     prot_matched_percentage = SP_score(prot_target_alignment, prot_src_alignment)
-    println("(nucleotide-level) alignment column match %: ", nuc_matched_percentage)
-    println("(protein-level) alignment column match %: ", prot_matched_percentage)
-    # TODO investiate if seeding quality can be improved
+    println("(nucleotide-level) alignment column match %: ", 100*nuc_matched_percentage)
+    println("(protein-level) alignment column match %: ", 100*prot_matched_percentage)
 catch
     println("alignments of different dimensions couldn't be compared.\nSkipping: 2. How well does seed_chain_align recover the 'true alignment' on a nucleotide level? (EXTRA)")
     println("target length: ", length(target_alignment[1]))

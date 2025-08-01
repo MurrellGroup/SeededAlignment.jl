@@ -1,4 +1,64 @@
-function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmerLength)
+# helper types and functions
+struct Endpoint
+    x::Int64
+    y::Int64
+    id::Int64
+    isBeginning::Bool
+end
+
+struct SampleMetrics
+    n::Int
+    meanX::Float64
+    meanY::Float64
+    nVarX::Float64
+    nVarY::Float64
+    dotXY::Float64
+    correlation::Float64
+end
+# TODO make immutable
+mutable struct KmerMatch
+    posA::Int64
+    posB::Int64
+end
+
+function CorrelationScore(s::SampleMetrics)
+    return sqrt(s.n) * s.correlation
+end
+
+# Estimate pealty between kmer matches x and y
+function getConnectionScore(x::KmerMatch, y::KmerMatch, k::Int64, gap_score_estimate::Float64, match_score_estimate::Float64)
+    m = y.posA - x.posA - k
+    n = y.posB - x.posB - k
+    return abs(m - n) * gap_score_estimate + min(m, n) * match_score_estimate
+end
+
+function SampleMetrics(X::Vector{<:Integer}, Y::Vector{<:Integer})
+    length(X) == length(Y) || error("Vectors must be of equal length.")
+    n = length(X)
+    meanX = sum(X) / n
+    meanY = sum(Y) / n
+    nVarX = sum(abs2, X .- meanX) #matchCount * variance of A
+    nVarY = sum(abs2, Y .- meanY) #matchCount * variance of B
+    dotXY = float(sum(@inbounds X[i] * Y[i] for i in 1:length(X)))
+    correlation = (dotXY - n * meanX * meanY) / sqrt(nVarX * nVarY)
+    return SampleMetrics(n, meanX, meanY, nVarX, nVarY, dotXY, correlation)
+end
+
+function remove_point(s::SampleMetrics, x::Integer, y::Integer)
+    n = s.n - 1
+    meanX = (s.n * s.meanX - x) / n
+    meanY = (s.n * s.meanY - y) / n
+    nVarX = s.nVarX - (s.n / n) * (x - s.meanX)^2 #newMatchCount * new variance of A
+    nVarY = s.nVarY - (s.n / n) * (y - s.meanY)^2 #newMatchCount * new variance of B
+    dotXY = s.dotXY - x*y
+    correlation = (dotXY - n * meanX * meanY) / sqrt(nVarX * nVarY)
+    return SampleMetrics(n, meanX, meanY, nVarX, nVarY, dotXY, correlation)
+end
+
+# seeding functions
+
+# TODO look for improvements here
+function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmerLength::Int64)
 
     # Abbreviations
     k = kmerLength
@@ -152,8 +212,8 @@ function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::M
     return kmerPath
 end
 
-#Kmer selection variant algorithm (unused currently) will be compared in benchmark
-function select_max_correlation_kmer_path(kmerMatches)
+#Kmer selection variant algorithm
+function select_max_correlation_kmer_path(kmerMatches::Vector{KmerMatch}, k::Int64)
 
     # Initialize
     matchCount = length(kmerMatches)
@@ -210,61 +270,4 @@ function select_max_correlation_kmer_path(kmerMatches)
     end
     
     return filteredKmerMatches
-end
-
-# helper types and functions
-struct Endpoint
-    x::Int64
-    y::Int64
-    id::Int64
-    isBeginning::Bool
-end
-
-struct SampleMetrics{T<:Real}
-    n::Int
-    meanX::T
-    meanY::T
-    nVarX::T
-    nVarY::T
-    dotXY::T
-    correlation::T
-end
-
-mutable struct KmerMatch
-    posA::Int64
-    posB::Int64
-end
-
-function CorrelationScore(s::SampleMetrics)
-    return sqrt(s.n) * s.correlation
-end
-
-# Estimate pealty between kmer matches x and y
-function getConnectionScore(x::KmerMatch, y::KmerMatch, k::Int64, gap_score_estimate::Float64, match_score_estimate::Float64)
-    m = y.posA - x.posA - k
-    n = y.posB - x.posB - k
-    return abs(m - n) * gap_score_estimate + min(m, n) * match_score_estimate
-end
-
-function SampleMetrics(X::Vector{<:Integer}, Y::Vector{<:Integer})
-    length(X) == length(Y) || error("Vectors must be of equal length.")
-    n = length(X)
-    meanX = sum(X) / n
-    meanY = sum(Y) / n
-    nVarX = sum(abs2, X .- meanX) #matchCount * variance of A
-    nVarY = sum(abs2, Y .- meanY) #matchCount * variance of B
-    dotXY = dot(X, Y)
-    correlation = (dotXY - n * meanX * meanY) / sqrt(nVarX * nVarY)
-    return SampleMetrics(n, meanX, meanY, nVarX, nVarY, dotXY, correlation)
-end
-
-function remove_point(s::SampleMetrics, x::Integer, y::Integer)
-    n = s.n - 1
-    meanX = (s.n * s.meanX - x) / n
-    meanY = (s.n * s.meanY - y) / n
-    nVarX = s.nVarX - (s.n / n) * (x - s.meanX)^2 #newMatchCount * new variance of A
-    nVarY = s.nVarY - (s.n / n) * (y - s.meanY)^2 #newMatchCount * new variance of B
-    dotXY = s.dotXY - x*y
-    correlation = (dotXY - n * meanX * meanY) / sqrt(nVarX * nVarY)
-    return SampleMetrics(n, meanX, meanY, nVarX, nVarY, dotXY, correlation)
 end
