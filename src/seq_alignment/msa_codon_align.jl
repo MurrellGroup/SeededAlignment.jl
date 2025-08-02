@@ -1,49 +1,71 @@
 """
-    msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
-        codon_scoring_on=true::Bool, use_seeded=true::Bool)
+    msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; 
+        moveset::Moveset=STD_CODON_MOVESET, 
+        scoring::ScoringScheme=STD_SCORING, 
+        codon_scoring_on=true::Bool)
 
-emm idk...
+Aligns a set of DNA sequences to a codon-level reference using seeded pairwise alignment and frame-aware cleanup.
+
+This function performs pairwise alignments of all sequences in `seqs` to the codon-aware reference `ref`, 
+using the provided `moveset` and `scoring` scheme. It then cleans the alignments to remove frameshift violations, 
+and constructs a multiple sequence alignment (MSA) by resolving codon insertion ambiguities through left-stacking relative to the reference.
+
+# Arguments
+- `ref::LongDNA{4}`: The codon-aware reference sequence used for alignment.
+- `seqs::Vector{LongDNA{4}}`: A vector of sequences to align to the reference.
+- `moveset::Moveset=STD_CODON_MOVESET`: Defines allowable alignment moves (e.g., codon insertions/deletions).
+- `scoring::ScoringScheme=STD_SCORING`: The scoring scheme used during alignment.
+- `codon_scoring_on::Bool=true`: Whether to apply codon-level scoring (rather than per-nucleotide).
+
+# Returns
+- `msa::Vector{LongDNA{4}}`: a frameshift-free multiple sequence alignment 
+
+# Examples
+
 """
-function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
-        codon_scoring_on=true::Bool, use_seeded=true::Bool)
-
+function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; 
+        moveset::Moveset=STD_CODON_MOVESET, 
+        scoring::ScoringScheme=STD_SCORING, 
+        codon_scoring_on=true::Bool
+)
     # perform pairwise seeded alignment for each sequence and clean indels which violate the reference readingFrame
-    cleaned_refs, cleaned_seqs = align_all_to_reference(ref, seqs, moveset, scoring, use_seeded = use_seeded, codon_scoring_on = codon_scoring_on, do_clean_frameshifts=true)
+    cleaned_refs, cleaned_seqs = align_all_to_reference(ref, seqs, 
+        moveset = moveset, 
+        scoring = scoring, 
+        codon_scoring_on = codon_scoring_on, 
+        do_clean_frameshifts = true
+    )
     # resolve codon_insertion ambigiouity via left-stacking relative to reference
     msa = scaffold_msa_from_pairwise(cleaned_refs, cleaned_seqs)
     return msa
 end
 
-"""
-    align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::Moveset, score_params::ScoringScheme; use_seeded::Bool=true)
-
-    Returns a seeded alignment with respect to the reference for each sequence. 
-    
-"""
-
-function align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}, moveset::Moveset, score_params::ScoringScheme; 
-        use_seeded=true::Bool, codon_scoring_on=true::Bool, do_clean_frameshifts=true::Bool)
-
+function align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; 
+        moveset::Moveset, 
+        scoring::ScoringScheme, 
+        codon_scoring_on=true::Bool, 
+        do_clean_frameshifts=true::Bool
+)
+    # Initialize space for alignment
     aligned_seqs = Vector{LongDNA{4}}(undef,length(seqs))
     aligned_refs = Vector{LongDNA{4}}(undef,length(seqs))
-    # choose alignment method
-    if use_seeded
-        align = seed_chain_align
-    else
-        align = nw_align
-    end
     # perform alignment for each sequence w.r.t. reference sequence
     for seqId in 1:length(seqs)
-        aligned_ref, aligned_seq = align(ref = ref, query = seqs[seqId], moveset=moveset, scoring=score_params, 
-            codon_scoring_on=codon_scoring_on, do_clean_frameshifts=do_clean_frameshifts) 
-        # save entire alignment to clean up later
-        aligned_seqs[seqId] = aligned_seq
-        aligned_refs[seqId] = aligned_ref
+        # cleaned pairwise alignments
+        aligned_ref, aligned_seq = seed_chain_align(
+            ref = ref, 
+            query = seqs[seqId], 
+            moveset=moveset, scoring=scoring, 
+            codon_scoring_on=codon_scoring_on, 
+            do_clean_frameshifts=do_clean_frameshifts
+        )
+        # save alignment results
+        aligned_refs[seqId], aligned_seqs[seqId] = aligned_ref, aligned_seq
     end
     return aligned_refs, aligned_seqs
 end
 
-# FIXME assume no single indels and codon_respecting insertions 0 mod 3
+# NOTE assume no single indels and codon_respecting insertions 0 mod 3
 function find_triplet_insertions_codonindex(aligned_ref::LongDNA{4})
     # TODO check for non-codon-respecting indels
     #@show length(aligned_ref)

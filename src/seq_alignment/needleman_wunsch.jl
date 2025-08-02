@@ -8,7 +8,16 @@ Computes an optimal global pairwise alignment of two ungapped `LongDNA{4}` seque
 with respect to the `Moveset` and the `ScoringScheme`. 
 
 """
-function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=STD_NOISY_MOVESET, scoring::ScoringScheme=STD_SCORING)
+function nw_align(A::LongDNA{4}, B::LongDNA{4}; 
+    moveset::Moveset = STD_NOISY_MOVESET, 
+    scoring::ScoringScheme = STD_SCORING
+)   
+    # throw exception if input sequences contains gaps
+    !any(x -> x == DNA_Gap, A) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
+    !any(x -> x == DNA_Gap, B) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
+    # throw exception if invalid nucleotide letter in LongDNA{4}
+    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
+    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), B) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
     # check no reference informed moves (Moev.ref=true) in moveset
     !contains_ref_move(moveset) || throw(ArgumentError("Moveset contains move(s) that considers reading frame (Move.ref=true)", 
                                                        " when no reference sequence was given!\n","Either set Move.ref=false for all moves in moveset", 
@@ -28,18 +37,41 @@ end
 
 """ 
     
-    nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING,
-        do_clean_frameshifts=false::Bool, verbose=false::Bool, codon_scoring_on=true::Bool)
+    nw_align(; 
+        ref::LongDNA{4}, 
+        query::LongDNA{4}, 
+        moveset::Moveset = STD_CODON_MOVESET, 
+        scoring::ScoringScheme = STD_SCORING,
+        codon_scoring_on::Bool = true,
+        do_clean_frameshifts::Bool = false, 
+        verbose::Bool = false
+)
+
 
 Needleman_Wunsch wrapper - reference informed, i.e. assumes one of the sequence has intact reading frame. 
 
 Optimally aligns a `query` sequence to a `ref` sequence using a codon-aware `Moveset` and `ScoringScheme`.
 
 **NOTE** We always assume the readingFrame is 1
-"""
-function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
-    do_clean_frameshifts=false::Bool, verbose=false::Bool, codon_scoring_on=true::Bool)
 
+# Arguments
+
+"""
+function nw_align(; 
+    ref::LongDNA{4}, 
+    query::LongDNA{4}, 
+    moveset::Moveset = STD_CODON_MOVESET, 
+    scoring::ScoringScheme = STD_SCORING,
+    codon_scoring_on::Bool = true,
+    do_clean_frameshifts::Bool = false, 
+    verbose::Bool = false
+)
+    # throw exception if input sequences contains gaps
+    !any(x -> x == DNA_Gap, ref) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
+    !any(x -> x == DNA_Gap, query) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
+    # throw exception if invalid nucleotide letter in LongDNA{4}
+    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), ref) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
+    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), query) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
     # check that moveset takes reference reading frame into account
     contains_ref_move(moveset) || throw(ArgumentError("Invalid Moveset for reference to query alignment!\n", 
                                         "At least one Move in Moveset must consider reference reading (Move.ref=true)",
@@ -52,16 +84,11 @@ function nw_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_COD
     )
 end
 
-# Needleman Wunsch alignment with affine scoring (internal function)
-# FIXME check how to handle cases where no valid alignment exists... 
-# @inbounds I don't get why that doesn't give speedup need to test in script
-@fastmath function _nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
+# Needleman Wunsch alignment with affine scoring (internal function) 
+# @inbounds I don't get why that doesn't give more speedup
+@inbounds @fastmath function _nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
     nuc_score_matrix::Matrix{Float64}, extension_score::Float64, codon_score_matrix::Matrix{Float64}=BLOSUM62, edge_extension_begin=false::Bool, 
     edge_extension_end=false::Bool, codon_scoring_on=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y}
-    
-    # throw exception if invalid alphabet in LongDNA{4}
-    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
-    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), B) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
 
     n, m = length(A), length(B)
 

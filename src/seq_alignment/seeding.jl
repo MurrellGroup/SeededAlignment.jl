@@ -12,39 +12,43 @@ struct SampleMetrics
     meanY::Float64
     nVarX::Float64
     nVarY::Float64
-    dotXY::Float64
+    dotXY::Float64 # this seems to always be Int64
     correlation::Float64
 end
-# TODO make immutable
-mutable struct KmerMatch
+
+struct KmerMatch
     posA::Int64
     posB::Int64
 end
 
-function CorrelationScore(s::SampleMetrics)
+@inline function CorrelationScore(s::SampleMetrics)
     return sqrt(s.n) * s.correlation
 end
 
 # Estimate pealty between kmer matches x and y
-function getConnectionScore(x::KmerMatch, y::KmerMatch, k::Int64, gap_score_estimate::Float64, match_score_estimate::Float64)
+@inline function getConnectionScore(x::KmerMatch, y::KmerMatch, k::Int64, gap_score_estimate::Float64, match_score_estimate::Float64)
     m = y.posA - x.posA - k
     n = y.posB - x.posB - k
     return abs(m - n) * gap_score_estimate + min(m, n) * match_score_estimate
 end
 
-function SampleMetrics(X::Vector{<:Integer}, Y::Vector{<:Integer})
+function SampleMetrics(X::Vector{Int64}, Y::Vector{Int64})
     length(X) == length(Y) || error("Vectors must be of equal length.")
     n = length(X)
     meanX = sum(X) / n
     meanY = sum(Y) / n
     nVarX = sum(abs2, X .- meanX) #matchCount * variance of A
     nVarY = sum(abs2, Y .- meanY) #matchCount * variance of B
-    dotXY = float(sum(@inbounds X[i] * Y[i] for i in 1:length(X)))
+    dotXY = 0
+    @inbounds @simd for i in 1:length(X)
+        dotXY += X[i] * Y[i]
+    end
     correlation = (dotXY - n * meanX * meanY) / sqrt(nVarX * nVarY)
-    return SampleMetrics(n, meanX, meanY, nVarX, nVarY, dotXY, correlation)
+    return SampleMetrics(n, meanX, meanY, nVarX, nVarY, Float64(dotXY), correlation)
 end
 
-function remove_point(s::SampleMetrics, x::Integer, y::Integer)
+# TODO benchmark if these benefit from inline
+function remove_point(s::SampleMetrics, x::Int64, y::Int64)
     n = s.n - 1
     meanX = (s.n * s.meanX - x) / n
     meanY = (s.n * s.meanY - y) / n

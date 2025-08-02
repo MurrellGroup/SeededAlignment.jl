@@ -31,6 +31,7 @@ seed_chain_align respectively. We attempt to compute the SP_score and TC_score f
 
 using Plots
 using BioSequences
+using SeededAlignment
 # include noising methods
 include("./../noising.jl")
 # alignment scoring
@@ -78,7 +79,7 @@ hist = histogram(levenshtein_distances, bins=5, xlabel="AA_levenshtein_distance"
 display(hist)
 savefig("seed_histogram.png")
 # show differences 
-# TODO 1 or 2 sequences get werid result. Investigate if due to frameshift in dataset 
+# TODO 1 or 2 sequences get werid result. Investigate why.
 for i in 1:num_seqs
     cur_denoised = noised_AA_seqs[i]
     cur_ref = AA_seqs[i]
@@ -117,7 +118,6 @@ println(idx)
 ref = ungap(ref_and_seqs[1])
 seq = ungap(ref_and_seqs[idx])
 frameshift_noise_seq!(seq)
-# TODO add seeds only comparison. 
 target_alignment = nw_align(ref=ref, query=seq, do_clean_frameshifts=true)
 src_alignment = seed_chain_align(ref=ref, query=seq, do_clean_frameshifts=true)
 #write_fasta(".fasta_output/pairwise_comparison.fasta", (target_alignment..., src_alignment...))

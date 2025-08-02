@@ -17,22 +17,35 @@ seq: ATG-ACGTA  -> cleaned_seq: ATGNACGTA
 
 **NOTE** We always assume the readingFrame is 1
 """
-function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4};verbose::Bool=false)
+function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; verbose::Bool=false)
+    # get ref sequence
+    ref = ungap(aligned_ref)
     # exception handling
-    length(ungap(aligned_ref)) % 3 == 0 || throw(ArgumentError("The original reference sequence (ungap(aligned_ref)) must have length divisible by 3")) 
-    !any((base_ref == '-') && (base_seq == '-') for (base_ref,base_seq) in zip(aligned_ref, aligned_seq)) || throw(ArgumentError("Both sequences have a gap at the same index, which therefore cannot be resolved")) 
-    
+    length(aligned_ref) == length(aligned_seq) || throw(ArgumentError("aligned sequences have differing lengths!"))
+    length(ref) % 3 == 0 || throw(ArgumentError("The original reference sequence (ungap(aligned_ref)) must have length divisible by 3"))
+    !any(
+        (base_ref == DNA_Gap) && (base_seq == DNA_Gap) for (base_ref,base_seq) in zip(aligned_ref, aligned_seq)
+    ) || throw(ArgumentError("Both sequences have a gap at the same index, which therefore cannot be resolved"))
+    # speed_up by checking if any frameshifts are present in the first place
+    if !_has_frameshifts(aligned_ref, aligned_seq)
+        return aligned_ref, aligned_seq
+    else
+        return _clean_frameshifts(aligned_ref, aligned_seq, verbose=verbose)
+    end
+end
+# internal _clean_frameshifts method
+function _clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; verbose::Bool=false)
     # codon bookkeeping variables
     insertAddon = 0
-    codon_length = length(ungap(aligned_ref))÷3
-    # only used in verbose mode
     ref = ungap(aligned_ref)
+    codon_length = length(ref)÷3
+    # only used in verbose mode
     total_num_of_clean_up_operations = 0
     total_num_deletion_gaps_cleaned = 0
     total_num_insertion_gaps_cleaned = 0
     # boolean lambda functions
     is_3gap = seq -> (seq == LongDNA{4}("---"))
-    no_gaps = seq -> (length(ungap(seq)) == length(seq))
+    no_gaps = seq -> !any(==(DNA_Gap), seq)
     # initialize empty alignment
     cleaned_ref = LongDNA{4}("")
     cleaned_seq = LongDNA{4}("")
@@ -173,8 +186,9 @@ clean a multiple sequence alignment provided one of the sequence is a reference 
 """
 function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seqs::Vector{LongDNA{4}})
     # exception handling
-    length(ungap(aligned_ref)) % 3 == 0 || throw(ArgumentError("Invalid input:\nThe original reference sequence (ungap(aligned_ref)) must have length divisible by 3"))
-    !any(length(aligned_ref) != length(seq) for seq in aligned_seqs) || throw(ArgumentError("Invalid input:\n Not all of the aligned sequences in given MSA have the same length!"))
+    !any(
+        length(aligned_ref) != length(seq) for seq in aligned_seqs
+    ) || throw(ArgumentError("Invalid input:\n Not all of the aligned sequences in given MSA have the same length!"))
     # clean_up heuristic - clean pairwise and scaffold
     N = length(aligned_seqs)
     cleaned_refs = Vector{LongDNA{4}}(undef, N)
@@ -189,21 +203,52 @@ function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seqs::Vector{LongDNA
         cleaned_seqs[i] = cleaned_seq
     end
     # scaffold the cleaned pairwise alignments into new frameshift-free multiple sequence alignment
-    cleaned_msa = scaffold_msa_from_pairwise(cleaned_refs, cleaned_seqs)
+    cleaned_msa = scaffold_msa_from_pairwise(cleaned_refs, cleaned_seqs) # TODO poorly optimized
     return cleaned_msa
 end
 
-function strip_gap_only_cols(seq1::LongDNA{4},seq2::LongDNA{4})
-    new_seq1 = LongDNA{4}()
-    new_seq2 = LongDNA{4}()
-    # iterate through alignment
-    for i in 1:length(seq1)
-        if seq1[i] == DNA_Gap && seq2[i] == DNA_Gap
-            continue
-        else
-            push!(new_seq1,seq1[i])
-            push!(new_seq2,seq2[i])
+function strip_gap_only_cols(seq1::LongDNA{4}, seq2::LongDNA{4})
+    len = length(seq1)
+    # count how many columns should be removed
+    cnt = 0
+    @inbounds for i in 1:len
+        if !(seq1[i] == DNA_Gap && seq2[i] == DNA_Gap)
+            cnt += 1
         end
     end
-    return new_seq1, new_seq2
+    # return original output if no cols contains only gaps
+    if cnt == 0
+        return seq1, seq2
+    else
+        # preallocate container
+        out1 = LongDNA{4}("-"^cnt)
+        out2 = LongDNA{4}("-"^cnt)
+        # fill output vectors
+        pos = 1
+        @inbounds for i in 1:len
+            if !(seq1[i] == DNA_Gap && seq2[i] == DNA_Gap)
+                out1[pos] = seq1[i]
+                out2[pos] = seq2[i]
+                pos += 1
+            end
+        end
+        # return output
+        return out1, out2
+    end
+end
+
+@inline function _has_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4})
+    # assumes valid nucleotide alignment with CDS ref
+    gap_run = 0
+    @inbounds for i in eachindex(aligned_ref)
+        if aligned_ref[i] == DNA_Gap || aligned_seq[i] == DNA_Gap
+            gap_run += 1
+            if gap_run % 3 != 0
+                return true
+            end
+        else
+            gap_run = 0
+        end
+    end
+    return false
 end

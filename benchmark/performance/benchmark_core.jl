@@ -7,7 +7,7 @@
 2. Try runing in a low-noise environment to reduce the variance between runs.
 3. Note that the runtime of seed_chain_align is strongly influnced by the similarity of the aligned sequences. 
 =#
-using BenchmarkTools 
+using BenchmarkTools
 using SeededAlignment
 using BioSequences
 using Random
@@ -22,20 +22,23 @@ We use 3 seperate datasets which can be edited in generate_performance_benchmark
 # _, seqs_pairwise = read_fasta("./benchmark/performance/pairwise.fasta")
 # _, seqs_msa_codon_align = read_fasta("./benchmark/performance/msa_codon_align.fasta")
 # _, seqs_clean_frameshifts = read_fasta("./benchmark/performance/clean_frameshifts.fasta")
-# ungap the inputs
+# ungap the inputs if needed
 # ref_pairwise, seq_pairwise = ungap(seqs_pairwise[1]), ungap(seqs_pairwise[2])
 # ref_msa, seqs_msa = ungap(seqs_msa_codon_align[1]), ungap(seqs_msa_codon_align[2:end]) # make this better and easier for user. 
 # ref_clean_frameshifts, seqs_clean_frameshifts = seqs_clean_frameshifts[1], seqs_clean_frameshifts[2:end]
 
+# NOTE dataset contains no gaps
 _, seqs = read_fasta("./benchmark/performance/benchmark_input_sequences.fasta")
-ref = ungap(seqs[1])
-pairwise_seq = ungap(seqs[end])
+# remove gaps 
+seqs = LongDNA{4}[ungap(seq) for seq in seqs]
+ref = seqs[1]
+pairwise_seq = seqs[end]
 # set up benchmarkGroup
 suite = BenchmarkGroup()
 # add benchmarks for pairwise alignment methods
 suite["seed_chain_align"] = @benchmark seed_chain_align(
-    ref=$(ref* ref), 
-    query=$(pairwise_seq * pairwise_seq),
+    ref=$(ref), 
+    query=$(pairwise_seq),
     moveset=$STD_CODON_MOVESET, 
     scoring=$STD_SCORING, 
     codon_scoring_on=$(true), 
@@ -43,8 +46,8 @@ suite["seed_chain_align"] = @benchmark seed_chain_align(
     verbose=$(false)
 )
 suite["nw_align"] = @benchmark nw_align(
-    ref=$(ref * ref),
-    query=$(pairwise_seq * pairwise_seq), 
+    ref=$(ref),
+    query=$(pairwise_seq), 
     moveset=$STD_CODON_MOVESET, 
     scoring=$STD_SCORING, 
     codon_scoring_on=$(true), 
@@ -53,10 +56,9 @@ suite["nw_align"] = @benchmark nw_align(
 )
 # add benchmarks for msa_codon_align
 suite["msa_codon_align"] = @benchmark msa_codon_align($ref, $(seqs[2:end]))
-
-# add benchmark for cleaning msa
+# TODO add better dataset to clean
 msa = msa_codon_align(ref, (seqs[2:end]))
-
+# add benchmark for cleaning msa
 suite["clean_frameshifts"] = @benchmark clean_frameshifts($msa[1], $msa[2:end])
 # show results
 println("seed_chain_align")

@@ -8,8 +8,8 @@ include("./../noising.jl")
 # TODO make it easier to customize similarity and such
 
 # sequence_length
-const seqlength = 699
-const num_seqs = 30
+const seqlength = 2000
+const num_seqs = 50
 # Initialize dataset
 dataset = Vector{LongDNA{4}}(undef, num_seqs+1)
 # ref sequence

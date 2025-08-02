@@ -6,7 +6,16 @@ seed_chain_align wrapper - no reference, i.e. makes no assumptions about the two
 Computes a heuristically guided global pairwise alignment of two ungapped `LongDNA{4}` sequence based on seeding. The seeds are then joined together 
 by doing a partial alignment with nw_align between seeds optimally with repect to the `Moveset` and `ScoringScheme`.
 """
-function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=STD_NOISY_MOVESET, scoring::ScoringScheme=STD_SCORING)
+function seed_chain_align(A::LongDNA{4}, B::LongDNA{4};
+    moveset::Moveset = STD_NOISY_MOVESET,
+    scoring::ScoringScheme = STD_SCORING
+)
+    # throw exception if input sequences contains gaps
+    !any(x -> x == DNA_Gap, A) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
+    !any(x -> x == DNA_Gap, B) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
+    # throw exception if invalid nucleotide letter in LongDNA{4}
+    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
+    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), B) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
     # check no reference informed moves (Move.ref=true) in moveset
     !contains_ref_move(moveset) || throw(ArgumentError("Moveset contains move(s) that considers reading frame (Move.ref=true)", 
                                                        " when no reference sequence was given!\n","Either set Move.ref=false for all moves in moveset", 
@@ -32,12 +41,22 @@ seed_chain_align wrapper - reference informed, i.e. assumes one of the sequence 
 
 Heuristically aligns a `query` sequence to a `ref` sequence based on seeding. The seeds are then joined together 
 by doing a partial alignment with nw_align between seeds optimally with repect to a codon-aware `Moveset` and `ScoringScheme`.
-
-**NOTE** We always assume the readingFrame is 1
 """
-function seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
-    codon_scoring_on=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool)
-
+function seed_chain_align(; 
+    ref::LongDNA{4},
+    query::LongDNA{4},
+    moveset::Moveset = STD_CODON_MOVESET,
+    scoring::ScoringScheme = STD_SCORING,
+    codon_scoring_on::Bool = true,
+    do_clean_frameshifts::Bool = false,
+    verbose::Bool = false
+)
+    # throw exception if input sequences contains gaps
+    !any(x -> x == DNA_Gap, ref) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
+    !any(x -> x == DNA_Gap, query) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
+    # throw exception if invalid nucleotide letter in LongDNA{4}
+    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), ref) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
+    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), query) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
     # check that moveset takes reference reading frame into account
     contains_ref_move(moveset) || throw(ArgumentError("Invalid Moveset for reference to query alignment!\n
                                         At least one Move in Moveset must consider reference reading (Move.ref=true)
@@ -51,9 +70,6 @@ end
 function _seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
     codon_scoring_on=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool; seed_debug_mode=false::Bool)
 
-    # throw exception if invalid alphabet in LongDNA{4}
-    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides!\nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
-    all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), B) || throw(ArgumentError("Input sequence contains non-standard nucleotides!\nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
     # unpack parameters
     k = scoring.kmer_length
     vgap_moves = moveset.vert_moves
@@ -75,16 +91,18 @@ function _seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::Moveset=STD_CO
     prevA = -k+1
     prevB = -k+1
     result = [LongDNA{4}(""), LongDNA{4}("")]
-    for kmer in kmerPath
-        # TODO make so seeding considers codons for better performance
+    # TODO make simd, 
+    @inbounds @views for kmer in kmerPath
+        # TODO make so seeding considers codons for better performance, especially then we can combine kmers better
+        # TODO we want to do "result .*=" all in one step preferably
         # shift start of kmer to start of next codon
         offset_from_codon_boundary = ((kmer.posA) % 3)
-        kmer.posA += (3-offset_from_codon_boundary)+4
-        kmer.posB += (3-offset_from_codon_boundary)+4
-        if !(kmer.posA == prevA + k && kmer.posB == prevB + k)
+        new_posA = (3-offset_from_codon_boundary)+4 + kmer.posA
+        new_posB = (3-offset_from_codon_boundary)+4 + kmer.posB
+        if !(new_posA == prevA + k && new_posB == prevB + k)
             if prevA == -k+1 && prevB == -k+1
                 # align without cleaning frameshifts
-                alignment = _nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, 
+                alignment = _nw_align(A[prevA + k : new_posA - 1], B[prevB + k : new_posB - 1], vgap_moves, hgap_moves, 
                     match_score_matrix, extension_score, codon_score_matrix, edge_ext_begin, false, codon_scoring_on
                 )
                 # add alignment unless seed_debug_mode
@@ -94,7 +112,7 @@ function _seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::Moveset=STD_CO
                 result .*= alignment
             else
                 # align without cleaning frameshifts
-                alignment = _nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, 
+                alignment = _nw_align(A[prevA + k : new_posA - 1], B[prevB + k : new_posB - 1], vgap_moves, hgap_moves, 
                     match_score_matrix, extension_score, codon_score_matrix, false, false, codon_scoring_on
                 )
                 # add alignment unless seed_debug_mode
@@ -104,9 +122,9 @@ function _seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::Moveset=STD_CO
                 result .*= alignment 
             end
         end
-        result .*= [A[kmer.posA : kmer.posA + k - 1], B[kmer.posB : kmer.posB + k - 1]]
-        prevA = kmer.posA
-        prevB = kmer.posB
+        result .*= [A[new_posA : new_posA + k - 1], B[new_posB : new_posB + k - 1]]
+        prevA = new_posA
+        prevB = new_posA
     end
     # align the remaining parts of the sequences - without cleaning frameshifts
     alignment = _nw_align(A[prevA + k : end], B[prevB + k : end], vgap_moves, hgap_moves, 
