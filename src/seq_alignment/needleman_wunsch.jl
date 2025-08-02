@@ -101,7 +101,8 @@ end
     # Length of sequences and matrices are increased according to offset
     A2 = LongDNA{4}("A")^(column_offset - 1) * A
     B2 = LongDNA{4}("A")^(row_offset - 1) * B
-
+    # initialize stop_aa
+    stop_aa = AminoAcid('*')
     # Initialize DP matrix
     # The cell at [x + row_offset, y + column_offset] is the score of the best alignment of A[1 : x] with B[1 : y]
     dp_matrix = fill(-Inf64, row_boundary, column_boundary)
@@ -129,8 +130,8 @@ end
                 # performance optimized translation
                 ref_AA = fast_translate((A2[column_index-3],A2[column_index-2],A2[column_index-1]))
                 seq_AA = fast_translate((B2[row_index-3],B2[row_index-2],B2[row_index-1]))
-                # TODO handle stop codon
-                if ref_AA != AminoAcid('*') && seq_AA != AminoAcid('*')
+                # TODO handle stop codons
+                if ref_AA != stop_aa && seq_AA != stop_aa
                     # get codon_mismatch_score
                     codon_match_score = codon_score_matrix[toInt(ref_AA),toInt(seq_AA)]
                     # get nucleotide mismatch_score
@@ -227,6 +228,35 @@ end
     # Flags for affine moves
     must_move_ver = false
     must_move_hor = false
+    # end extension backtrack
+    if edge_extension_end && x == column_boundary 
+        for i in 1:y-row_offset
+            if isapprox(dp_matrix[y,x],dp_matrix[y-i,x]+i*extension_score)
+                for j ∈ 1 : i
+                    push!(res_A, DNA_Gap)
+                    push!(res_B, B2[y - j])
+                end
+                y -= i
+                # do stuff
+                break
+            end
+        end
+    end
+    # end extension backtrack
+    if edge_extension_end && y == row_boundary
+        for i in 1:x-column_offset
+            if isapprox(dp_matrix[y,x],dp_matrix[y,x-i]+i*extension_score)
+                for j ∈ 1:i
+                    push!(res_A, A2[x - j])
+                    push!(res_B, DNA_Gap)
+                end
+                x -= i
+                # do stuff
+                break
+            end
+        end
+    end
+    # loop rest of backtrack
     while x > column_offset || y > row_offset
         top_sequence_pos = x-column_offset
         left_sequence_pos = y-row_offset
@@ -239,39 +269,9 @@ end
             push!(res_B, DNA_Gap)
             x -= 1
         else
-            # TODO move edge extension boundary from main backtrack for speedup
-            # end extension backtrack
-            if x == column_boundary && edge_extension_end
-                for i in 1:y-row_offset
-                    if isapprox(dp_matrix[y,x],dp_matrix[y-i,x]+i*extension_score)
-                        for j ∈ 1 : i
-                            push!(res_A, DNA_Gap)
-                            push!(res_B, B2[y - j])
-                        end
-                        y -= i
-                        # do stuff
-                        break
-                    end
-                end
-            end
-            if y == row_boundary && edge_extension_end
-                for i in 1:x-column_offset
-                    if isapprox(dp_matrix[y,x],dp_matrix[y,x-i]+i*extension_score)
-                        for j ∈ 1:i
-                            push!(res_A, A2[x - j])
-                            push!(res_B, DNA_Gap)
-                        end
-                        x -= i
-                        # do stuff
-                        break
-                    end
-                end
-            end
-
             # record previous position
             px = x
             py = y
-
             # iterate through digonal match moves
             match_Found = false
             if !must_move_hor && !must_move_ver # TODO check if we ever get out of index range here
@@ -280,7 +280,7 @@ end
                     ref_AA = fast_translate((A2[x-3],A2[x-2],A2[x-1]))
                     seq_AA = fast_translate((B2[y-3],B2[y-2],B2[y-1]))
                     # TODO handle stop codon more flexibly
-                    if ref_AA != AminoAcid('*') && seq_AA != AminoAcid('*')
+                    if ref_AA != stop_aa && seq_AA != stop_aa
                         # get codon_match_score
                         match_score = codon_score_matrix[toInt(ref_AA), toInt(seq_AA)]
                         # get nucleotide_match_score
@@ -379,7 +379,7 @@ end
             end
 
             # if no move was found
-            if px == x && py == y
+            if verbose && (px == x && py == y)
                 error("Backtracking failed")
             end
         end
