@@ -26,14 +26,18 @@ and constructs a multiple sequence alignment (MSA) by resolving codon insertion 
 function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; 
         moveset::Moveset=STD_CODON_MOVESET, 
         scoring::ScoringScheme=STD_SCORING, 
-        codon_scoring_on=true::Bool
+        codon_scoring_on::Bool = true,
+        verbose::Bool = false,
+        use_seeded::Bool = true
 )
     # perform pairwise seeded alignment for each sequence and clean indels which violate the reference readingFrame
     cleaned_refs, cleaned_seqs = align_all_to_reference(ref, seqs, 
         moveset = moveset, 
         scoring = scoring, 
         codon_scoring_on = codon_scoring_on, 
-        do_clean_frameshifts = true
+        do_clean_frameshifts = true,
+        verbose = verbose,
+        use_seeded = use_seeded
     )
     # resolve codon_insertion ambigiouity via left-stacking relative to reference
     msa = scaffold_msa_from_pairwise(cleaned_refs, cleaned_seqs)
@@ -44,20 +48,28 @@ function align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}};
         moveset::Moveset, 
         scoring::ScoringScheme, 
         codon_scoring_on=true::Bool, 
-        do_clean_frameshifts=true::Bool
+        do_clean_frameshifts=true::Bool,
+        verbose::Bool = false,
+        use_seeded::Bool = true
 )
     # Initialize space for alignment
     aligned_seqs = Vector{LongDNA{4}}(undef,length(seqs))
     aligned_refs = Vector{LongDNA{4}}(undef,length(seqs))
+    if use_seeded
+        align = seed_chain_align
+    else
+        align = nw_align
+    end
     # perform alignment for each sequence w.r.t. reference sequence
     for seqId in 1:length(seqs)
         # cleaned pairwise alignments
-        aligned_ref, aligned_seq = seed_chain_align(
+        aligned_ref, aligned_seq = align(
             ref = ref, 
             query = seqs[seqId], 
-            moveset=moveset, scoring=scoring, 
-            codon_scoring_on=codon_scoring_on, 
-            do_clean_frameshifts=do_clean_frameshifts
+            moveset = moveset, scoring = scoring, 
+            codon_scoring_on = codon_scoring_on, 
+            do_clean_frameshifts = do_clean_frameshifts,
+            verbose = verbose
         )
         # save alignment results
         aligned_refs[seqId], aligned_seqs[seqId] = aligned_ref, aligned_seq

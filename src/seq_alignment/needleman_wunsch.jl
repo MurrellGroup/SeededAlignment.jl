@@ -84,8 +84,7 @@ function nw_align(;
     )
 end
 
-# Needleman Wunsch alignment with affine scoring (internal function) 
-# @inbounds I don't get why that doesn't give more speedup
+# Needleman Wunsch alignment with affine scoring (internal function)
 @inbounds @fastmath function _nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
     nuc_score_matrix::Matrix{Float64}, extension_score::Float64, codon_score_matrix::Matrix{Float64}=BLOSUM62, edge_extension_begin=false::Bool, 
     edge_extension_end=false::Bool, codon_scoring_on=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y}
@@ -231,7 +230,7 @@ end
     # end extension backtrack
     if edge_extension_end && x == column_boundary 
         for i in 1:y-row_offset
-            if isapprox(dp_matrix[y,x],dp_matrix[y-i,x]+i*extension_score)
+            if fast_simpler_isapprox(dp_matrix[y,x],dp_matrix[y-i,x]+i*extension_score)
                 for j ∈ 1 : i
                     push!(res_A, DNA_Gap)
                     push!(res_B, B2[y - j])
@@ -245,7 +244,7 @@ end
     # end extension backtrack
     if edge_extension_end && y == row_boundary
         for i in 1:x-column_offset
-            if isapprox(dp_matrix[y,x],dp_matrix[y,x-i]+i*extension_score)
+            if fast_simpler_isapprox(dp_matrix[y,x],dp_matrix[y,x-i]+i*extension_score)
                 for j ∈ 1:i
                     push!(res_A, A2[x - j])
                     push!(res_B, DNA_Gap)
@@ -272,9 +271,12 @@ end
             # record previous position
             px = x
             py = y
+            #= TODO 
+                I think if we while loop the match codons and nucleotide parts until we are forced to do insertions I think it will be faster maybe.
+            =# 
             # iterate through digonal match moves
             match_Found = false
-            if !must_move_hor && !must_move_ver # TODO check if we ever get out of index range here
+            if !must_move_hor && !must_move_ver 
                 # reward for matching codons if enabled
                 if codon_scoring_on && (top_sequence_pos) % 3 == 0
                     ref_AA = fast_translate((A2[x-3],A2[x-2],A2[x-1]))
@@ -286,7 +288,7 @@ end
                         # get nucleotide_match_score
                         match_score += sum(t -> nuc_score_matrix[toInt(A2[x - t]), toInt(B2[y - t])], 1 : 3)
                         # check if the move leads to the current cell
-                        if isapprox(dp_matrix[y, x],dp_matrix[y - 3,x - 3] + match_score)
+                        if fast_simpler_isapprox(dp_matrix[y, x],dp_matrix[y - 3,x - 3] + match_score)
                             # record the path
                             for i ∈ 1:3
                                 push!(res_A, A2[x - i])
@@ -303,7 +305,7 @@ end
                     # calculate total (mis-)match score
                     s = nuc_score_matrix[toInt(A2[x-1]), toInt(B2[y-1])]
                     # check if the move leads to the current cell
-                    if isapprox(dp_matrix[y, x],dp_matrix[y - 1,x - 1] + s)
+                    if fast_simpler_isapprox(dp_matrix[y, x],dp_matrix[y - 1,x - 1] + s)
                         # record the path
                         push!(res_A, A2[x - 1])
                         push!(res_B, B2[y - 1])
@@ -321,12 +323,12 @@ end
                     # check if the move leads to the current cell
                     if k.extendable
                         current_score = must_move_ver ? vaffine_matrix[y, x] : dp_matrix[y, x]
-                        can_move_affine = (isapprox(current_score,vaffine_matrix[y-k.step_length, x] + extension_score * k.step_length))
-                        can_move_regular = (isapprox(current_score,dp_matrix[y-k.step_length, x] + k.score))
+                        can_move_affine = (fast_simpler_isapprox(current_score,vaffine_matrix[y-k.step_length, x] + extension_score * k.step_length))
+                        can_move_regular = (fast_simpler_isapprox(current_score,dp_matrix[y-k.step_length, x] + k.score))
                     else
                         current_score = dp_matrix[y,x]
                         can_move_affine = (false)
-                        can_move_regular = (isapprox(current_score,dp_matrix[y-k.step_length,x] + k.score))
+                        can_move_regular = (fast_simpler_isapprox(current_score,dp_matrix[y-k.step_length,x] + k.score))
                     end
                     
                     if can_move_affine || can_move_regular
@@ -353,12 +355,12 @@ end
                     # check if the move leads to the current cell
                     if k.extendable
                         current_score = must_move_hor ? haffine_matrix[y, x] : dp_matrix[y, x]
-                        can_move_affine = (isapprox(current_score,haffine_matrix[y, x-k.step_length] + extension_score * k.step_length))
-                        can_move_regular = (isapprox(current_score,dp_matrix[y,x-k.step_length] + k.score))
+                        can_move_affine = (fast_simpler_isapprox(current_score,haffine_matrix[y, x-k.step_length] + extension_score * k.step_length))
+                        can_move_regular = (fast_simpler_isapprox(current_score,dp_matrix[y,x-k.step_length] + k.score))
                     else
                         current_score = dp_matrix[y, x]
                         can_move_affine = (false)
-                        can_move_regular = (isapprox(current_score,dp_matrix[y,x-k.step_length] + k.score))
+                        can_move_regular = (fast_simpler_isapprox(current_score,dp_matrix[y,x-k.step_length] + k.score))
                     end
 
                     if can_move_affine || can_move_regular
@@ -393,4 +395,8 @@ end
     end
     # return alignment
     return aligned_A, aligned_B
+end
+# Didn't give a noticible performance boost
+@inline function fast_simpler_isapprox(a::Float64, b::Float64; eps::Float64=1e-5)
+    return abs(a - b) < eps
 end

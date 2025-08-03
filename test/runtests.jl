@@ -143,10 +143,9 @@ using Random
         # 5.2 test indels not break codon readingframe after clean_up
         @testset "5.2 test indels not break codon readingframe after clean_up" begin
             msa = msa_codon_align(ref, seqs)
-            aligned_ref = msa[1]
+            cleaned_msa = clean_frameshifts(msa[1], msa[2:end])
             for i in 1:10
-                cleaned_ref, cleaned_seq = clean_frameshifts(aligned_ref, msa[i+1])
-                @test cleaned_seq == msa[i+1]
+                @test cleaned_msa[i+1] == msa[i+1]
             end
         end
         # 5.3 type inferrence

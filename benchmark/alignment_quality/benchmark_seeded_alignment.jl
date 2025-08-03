@@ -59,19 +59,17 @@ end
 #= 1. How well do seed_chain_align and nw_align recover the "true protein sequences" after cleaning frameshifts?
 ________________________________________________________________________________________________________________=#
 
-# TODO use public dataset
-
 #collect sequnces and ungap sequence 
-names, ref_and_seqs = read_fasta(".fasta_input/P018_subset.fasta")
+names, ref_and_seqs = read_fasta("./benchmark/alignment_quality/frameshift_free_msa_raw.fasta")
 ref = ungap(ref_and_seqs[1])
 seqs = [ungap(seq) for seq in ref_and_seqs[2:end]]
 num_seqs = length(seqs)
 # convert seqs to AA_seqs
 AA_seqs = LongAA[BioSequences.translate(seqs[i]) for i in 1:num_seqs]
 # noise the sequences bad noise
-noised_seqs = LongDNA{4}[frameshift_noise_seq!(seqs[i]) for i in 1:num_seqs]
-msa = msa_codon_align(ref, noised_seqs, codon_scoring_on=true)
-write_fasta(".fasta_output/msa_problem.fasta", msa)
+noised_seqs = LongDNA{4}[frameshift_noise_seq(seqs[i]) for i in 1:num_seqs]
+msa = msa_codon_align(ref, noised_seqs, codon_scoring_on=false)
+write_fasta(".fasta_output/denoised_codon_msa.fasta", msa)
 noised_AA_seqs = LongAA[BioSequences.translate(ungap(msa[i+1])) for i in 1:num_seqs]
 levenshtein_distances = Int64[levenshtein(noised_AA_seqs[i], AA_seqs[i]) for i in 1:num_seqs]
 # Create a histogram
@@ -83,6 +81,8 @@ savefig("seed_histogram.png")
 for i in 1:num_seqs
     cur_denoised = noised_AA_seqs[i]
     cur_ref = AA_seqs[i]
+    @show length(cur_denoised)
+    @show length(cur_ref)
     @assert length(cur_denoised) == length(cur_ref)
     for j in 1:length(cur_ref)
         if cur_ref[j] != cur_denoised[j] && (cur_denoised[j] != AminoAcid('X'))
@@ -108,10 +108,8 @@ src_alignment = seed_chain_align(ref=ref, query=seq, do_clean_frameshifts=true)
 write_fasta(".fasta_output/pairwise_comparison.fasta", (target_alignment..., src_alignment...))
 #= 2. How well does seed_chain_align recover the "true alignment" on a nucleotide level? (EXTRA)
 ________________________________________________________________________________________________________________=#
-# TODO optional method to check percentage match_sequences. Will be kinda slow. 
-
 #collect sequnces and ungap sequence 
-names, ref_and_seqs = read_fasta(".fasta_input/P018_subset.fasta")
+names, ref_and_seqs = read_fasta("./benchmark/alignment_quality/msa_codon_align.fasta")
 rng = RandomDevice()
 idx = rand(rng, 2:num_seqs)
 println(idx)

@@ -3,59 +3,128 @@ using Distributions
 using Random
 
 # TODO add an improved mutateSequence function using better noise
-function mutateSequence(seq::LongDNA{4})
+function mutateSequence(org_seq::LongDNA{4}; 
+    codon_indel_avg::Float64 = 5.0, 
+    frameshift_indel_avg::Float64 = 3.0,
+    sub_mutation_avg::Float64 = 5.0    
+)
+    # initialize mutations
+    seq = copy(org_seq)
     n = length(seq)
     dna = LongDNA{4}("ACGT")
-    num_mutations = rand(Poisson(10))
-    num_indels = rand(Poisson(10))
-    # substritution mutations
-    for i in 1:num_mutations
-        mutation_pos = rand(2:n-1)
-        seq = seq[1:mutation_pos-1] * randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1) * seq[mutation_pos+1:end]
-    end
-    # insertion/deletion mutations
-    for i in 1:num_indels
+    num_codon_indels = rand(Poisson(codon_indel_avg))
+    num_frameshifts = rand(Poisson(frameshift_indel_avg))
+    num_sub_mutations = rand(Poisson(sub_mutation_avg))
+    # count mutation types
+    cnt_codon_del = 0
+    cnt_codon_ins = 0
+    cnt_frm_del = 0
+    cnt_frm_ins = 0
+    # codon indel mutations
+    for i in 1:num_codon_indels
+        println(length(seq))
         indel_pos = rand(1:(n-4)÷3)
-        a = rand(1:10)
-        if a >= 8
+        println("indel_pos: ", 3*indel_pos)
+        a = rand(Bool)
+        if a 
+            println("insert")
             # insertion
-            seq = seq[1:3*indel_pos] * randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 3) * seq[3*indel_pos + 1 : end]
-            n += 3
-        elseif a >= 5
+            # length = rand(1:4)
+            len = 1
+            inserted_codon = get_rand_non_stop_codons(num_codons = len)
+            seq = seq[1:3*indel_pos] * inserted_codon * seq[3*indel_pos + 1 : end]
+            n += 3*len
+            cnt_codon_ins += len
+        else
+            println("deletion")
+            cnt_codon_del += 1
             seq = seq[1:3*indel_pos] * seq[3*indel_pos + 4 : end]
             n -= 3
-        elseif a > 3
-            seq = seq[1:3*indel_pos] * randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1) * seq[3*indel_pos + 1 : end]
+        end
+        println(length(seq))
+    end
+    # frameshift mutations
+    for i in 1:num_frameshifts
+        indel_pos = rand(2:n-1)
+        a = rand(Bool)
+        if a
+            println("frameshift insert")
+            cnt_frm_ins += 1
+            seq = seq[1:indel_pos] * randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1) * seq[indel_pos + 1 : end]
             n += 1
         else
             # deletion
-            deleteat!(seq, 3*indel_pos+1)
+            cnt_frm_del += 1
+            println("frameshift deletion")
+            deleteat!(seq, indel_pos+1)
             n -= 1
         end
     end
-
+    # substritution mutations
+    for i in 1:num_sub_mutations
+        println("mutation")
+        mutation_pos = rand(2:n-1)
+        seq = seq[1:mutation_pos-1] * randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1) * seq[mutation_pos+1:end]
+    end
+    println("num codon deletions: ", cnt_codon_del)
+    println("num codon insertions: ", cnt_codon_ins)
+    println("num substitution mutations: ", num_sub_mutations)
+    println("num frameshift deletions: ", cnt_frm_del)
+    println("num frameshift insertions: ", cnt_frm_ins)
     return seq
 end
-# TODO confirm frameshifts don't become a codon indel
-function frameshift_noise_seq!(seq::LongDNA{4})
+
+function frameshift_noise_seq!(seq::LongDNA{4}; frameshift_indel_avg::Float64=3.0)
     n = length(seq)
     dna = LongDNA{4}("ACGT")
-    num_frameshifts = rand(Poisson(3))
+    num_frameshifts = rand(Poisson(frameshift_indel_avg))
+    # insertion/deletion mutations
+    for i in 1:num_frameshifts
+        indel_pos = rand(1:(n-4))
+        a = rand(Bool)
+        if a
+            # insertion
+            seq = seq[1:indel_pos] * randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1) * seq[indel_pos + 1 : end]
+            n += 1
+        else
+            # deletion
+            deleteat!(seq, indel_pos+1)
+            n -= 1
+        end
+    end
+    return seq
+end
+
+# TODO confirm frameshifts don't become a codon indel
+function frameshift_noise_seq(seq::LongDNA{4}; frameshift_indel_avg::Float64=3.0)
+    n = length(seq)
+    dna = LongDNA{4}("ACGT")
+    num_frameshifts = rand(Poisson(frameshift_indel_avg))
+    new_seq = copy(seq)
     # insertion/deletion mutations
     for i in 1:num_frameshifts
         indel_pos = rand(1:(n-4)÷3)
         a = rand(Bool)
         if a
             # insertion
-            seq = seq[1:3*indel_pos] * randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1) * seq[3*indel_pos + 1 : end]
+            new_seq = new_seq[1:3*indel_pos] * randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1) * new_seq[3*indel_pos + 1 : end]
             n += 1
         else
             # deletion
-            deleteat!(seq, 3*indel_pos+1)
+            deleteat!(new_seq, 3*indel_pos+1)
             n -= 1
         end
     end
-    return seq
+    return new_seq
+end
+
+function get_rand_non_stop_codons(; num_codons::Int64=1)
+    codon_chain = LongDNA{4}("")
+    non_stop_codons = get_non_stop_codons()
+    for i in 1:num_codons
+        append!(codon_chain, rand(non_stop_codons))
+    end
+    return codon_chain
 end
 
 function get_non_stop_codons()

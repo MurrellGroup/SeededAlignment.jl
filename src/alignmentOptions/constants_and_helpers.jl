@@ -73,10 +73,10 @@ const BLOSUM62::Matrix{Float64} = [
 # TODO add ambigious nucleotide scoring
 # Order: A, C, G, T
 const NUC_MATRIX = [
-     1.0  -2.0   0.0  -2.0;  # A
-    -2.0   1.0  -2.0   0.0;  # C
-     0.0  -2.0   1.0  -2.0;  # G
-    -2.0   0.0  -2.0   1.0   # T
+     0.0  -3.0   -1.5  -3.0;  # A
+    -3.0   0.0  -3.0   -1.5;  # C
+    -1.5  -3.0   0.0  -3.0;  # G
+    -3.0   -1.5  -3.0   0.0   # T
 ]
 
 ## helper functions ##

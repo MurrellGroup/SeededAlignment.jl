@@ -15,19 +15,19 @@ dataset = Vector{LongDNA{4}}(undef, num_seqs+1)
 ref = generate_random_ref(seqlength÷3)
 dataset[1] = ref
 # generate shared mutations 
-# TODO stack mutations for more complex alignment dataset
+# TODO stack mutations for more complex alignment dataset and introduce some independence
 shared_mutation = mutateSequence(ref,
     codon_indel_avg=5.0,
-    frameshift_indel_avg=1.0,
-    sub_mutation_avg = 2.0
+    frameshift_indel_avg=0.0,
+    sub_mutation_avg = 5.0
 )
 # add frameshift errors when delegating to contigs
 for j in 1:num_seqs
     dataset[j+1] = copy(shared_mutation)
-    frameshift_noise_seq!(dataset[j+1], frameshift_indel_avg = 4.0)
 end
-write_fasta("./benchmark/performance/benchmark_input_sequences.fasta", dataset)
+write_fasta("./benchmark/alignment_quality/frameshift_free_msa_raw.fasta", dataset)
 msa = msa_codon_align(ref, dataset[2:end], use_seeded=true)
-write_fasta("./benchmark/performance/benchmarked_msa_result.fasta", msa)
-msa = msa_codon_align(ref, dataset[2:end], use_seeded=false)
-write_fasta("./benchmark/performance/benchmarked_msa_result.fasta", msa)
+write_fasta("./benchmark/alignment_quality/msa_codon_align.fasta", msa)
+# to compare with nw_align
+#msa = msa_codon_align(ref, dataset[2:end], use_seeded=false)
+#write_fasta("./benchmark/alignment_quality/msa_codon_align.fasta", msa)

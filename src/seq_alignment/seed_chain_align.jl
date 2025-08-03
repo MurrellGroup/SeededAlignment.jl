@@ -26,8 +26,9 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4};
     # force no codon_scoring_on
     codon_scoring_on=false
     # unpack arguments and call the internal alignment function
+    seed_debug_mode=false
     _seed_chain_align(
-        A, B, moveset, scoring, codon_scoring_on, do_clean_frameshifts, verbose
+        A, B, moveset, scoring, codon_scoring_on, do_clean_frameshifts, verbose, seed_debug_mode=seed_debug_mode
     )
 
 end
@@ -62,12 +63,13 @@ function seed_chain_align(;
                                         At least one Move in Moveset must consider reference reading (Move.ref=true)
                                          - in other words codon insertions or deletions must be allowed."))
     # unpack arguments and call the internal alignment function
+    seed_debug_mode=false
     _seed_chain_align(
-        ref, query, moveset, scoring, codon_scoring_on, do_clean_frameshifts, verbose
+        ref, query, moveset, scoring, codon_scoring_on, do_clean_frameshifts, verbose, seed_debug_mode=seed_debug_mode
     )
 end
 
-function _seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
+@inbounds function _seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
     codon_scoring_on=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool; seed_debug_mode=false::Bool)
 
     # unpack parameters
@@ -91,8 +93,7 @@ function _seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::Moveset=STD_CO
     prevA = -k+1
     prevB = -k+1
     result = [LongDNA{4}(""), LongDNA{4}("")]
-    # TODO make simd, 
-    @inbounds @views for kmer in kmerPath
+    @views for kmer in kmerPath
         # TODO make so seeding considers codons for better performance, especially then we can combine kmers better
         # TODO we want to do "result .*=" all in one step preferably
         # shift start of kmer to start of next codon

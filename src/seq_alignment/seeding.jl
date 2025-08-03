@@ -45,7 +45,7 @@ end
             for iA in kmerDict[kmer]
                 diag_idx = iA - iB + n + 1
                 # sufficent condition for no overlap
-                # TODO could be bad if iA is big early because blocks other matches along that diagonal
+                # TODO could be bad if iA is big early because blocks other matches along that diagonal. Remedy was suggested above.
                 if diagonals[diag_idx] + k <= iA
                     push!(kmer_matches, KmerMatch(iA, iB))
                     diagonals[diag_idx] = iA
@@ -75,7 +75,7 @@ end
 #kmer selection based on approximated nw_align score
 # TODO look for improvements here
 # TODO preallocate connector kmer_matches
-function select_kmer_path(kmerMatches::Vector{KmerMatch}, m::Int64, n::Int64, match_score_matrix::Matrix{Float64}, 
+@inbounds @fastmath function select_kmer_path(kmerMatches::Vector{KmerMatch}, m::Int64, n::Int64, match_score_matrix::Matrix{Float64}, 
     vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, extension_score::Float64, k::Int64) where {X, Y}
     
     # Produce constants used for estimating scores without A and B
@@ -232,7 +232,7 @@ function remove_point(s::SampleMetrics, x::Int64, y::Int64)
 end
 
 #Kmer selection variant algorithm based on correlation scoring
-function select_max_correlation_kmer_path(kmerMatches::Vector{KmerMatch}, k::Int64)
+@inbounds @fastmath function select_max_correlation_kmer_path(kmerMatches::Vector{KmerMatch}, k::Int64)
 
     # Initialize
     matchCount = length(kmerMatches)

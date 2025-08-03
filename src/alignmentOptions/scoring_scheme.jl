@@ -112,9 +112,9 @@ Return a standard codon-aware `ScoringScheme` for alignment.
 
 Use this as a default `ScoringScheme` for codon-preserving alignments.
 """
-# TODO handle stop codon
+# TODO handle stop codon, better score matricies
 const STD_SCORING = ScoringScheme(
-	extension_score=-3.0,
+	extension_score=-0.5,
 	kmer_length=15,
 	edge_ext_begin=true,
 	edge_ext_end=true,
