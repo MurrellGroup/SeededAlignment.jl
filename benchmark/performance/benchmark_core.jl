@@ -59,7 +59,7 @@ suite["msa_codon_align"] = @benchmark msa_codon_align($ref, $(seqs[2:end]))
 # TODO add better dataset to clean
 msa = msa_codon_align(ref, (seqs[2:end]))
 # add benchmark for cleaning msa
-suite["clean_frameshifts"] = @benchmark clean_frameshifts($msa[1], $msa[2:end])
+suite["clean_frameshifts - msa"] = @benchmark clean_frameshifts($msa[1], $msa[2:end])
 # show results
 println("seed_chain_align")
 display(suite["seed_chain_align"])
@@ -67,8 +67,8 @@ println("nw_align")
 display(suite["nw_align"])
 println("msa_codon_align")
 display(suite["msa_codon_align"])
-println("clean_frameshifts")
-display(suite["clean_frameshifts"])
+println("clean_frameshifts - msa")
+display(suite["clean_frameshifts - msa"])
 # compare with old results if they exist
 if isfile("benchmark_core_results.json")
     master_suite = BenchmarkTools.load("benchmark_core_results.json")[1]
@@ -94,9 +94,9 @@ if !ismissing(master_suite)
     b2 = median(master_suite["msa_codon_align"])
     display(judge(b1, b2))
 
-    println("clean_frameshifts")
-    b1 = median(suite["clean_frameshifts"])
-    b2 = median(master_suite["clean_frameshifts"])
+    println("clean_frameshifts - msa")
+    b1 = median(suite["clean_frameshifts - msa"])
+    b2 = median(master_suite["clean_frameshifts - msa"])
     display(judge(b1, b2))
 end
 

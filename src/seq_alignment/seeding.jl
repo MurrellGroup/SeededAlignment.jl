@@ -1,28 +1,68 @@
 # helper types and functions
-struct Endpoint
-    x::Int64
-    y::Int64
-    id::Int64
-    isBeginning::Bool
-end
-
-struct SampleMetrics
-    n::Int
-    meanX::Float64
-    meanY::Float64
-    nVarX::Float64
-    nVarY::Float64
-    dotXY::Float64 # this seems to always be Int64
-    correlation::Float64
-end
-
 struct KmerMatch
     posA::Int64
     posB::Int64
 end
 
-@inline function CorrelationScore(s::SampleMetrics)
-    return sqrt(s.n) * s.correlation
+# seeding functions
+
+# TODO look for improvements here
+# TODO use views and convert kmer to hash_key, then use the hash_key as the key for the dict. 
+@views function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmer_length::Int64; repetition_threshold::Int64 = 5) 
+
+    # Abbreviations
+    k = kmer_length
+    m = length(A)
+    n = length(B)
+
+    # List of all kmer matches between A and B
+    kmer_matches = KmerMatch[]
+    # Produce dictionary of all kmers in A
+    # TODO replace Vector{Int64} with NTuple or something that uses repetition_threshold
+    # TODO consider replacing keys to Int64
+    kmerDict = Dict{LongDNA{4}, Vector{Int64}}()
+    for i in 1:m-k+1
+        @views kmer = A[i:i+k-1]
+        if haskey(kmerDict, kmer)
+            push!(kmerDict[kmer], i)
+        else
+            kmerDict[kmer] = [i]
+        end
+    end
+
+    # Search B for any matching kmers
+    diagonals = fill(typemin(Int64), m+n)
+    #= diagonals[i] = the rightmost kmer start_index in A that matches with a kmer of B in diagonal i. 
+    Used to avoid overlapping kmerMatches=#
+
+    #= TODO improvement idea - find all kmerMatches on diagional i. Sort them, itterate, check if current KmerMatch 
+    overlaps with previous added KmerMatch. On the other hand this causes more kmerMatches to appear and make the alignment slower overall.=#
+    for iB in 1 : n-k+1
+        @views kmer = B[iB : iB+k-1]
+        # skips kmers which are too common in sequence A
+        if (haskey(kmerDict, kmer) && length(kmerDict[kmer]) <= repetition_threshold)
+            #Add found match(es) to list
+            for iA in kmerDict[kmer]
+                diag_idx = iA - iB + n + 1
+                # sufficent condition for no overlap
+                # TODO could be bad if iA is big early because blocks other matches along that diagonal
+                if diagonals[diag_idx] + k <= iA
+                    push!(kmer_matches, KmerMatch(iA, iB))
+                    diagonals[diag_idx] = iA
+                end
+            end
+        end
+    end
+
+    return kmer_matches
+end
+
+# structs and helper methods for kmer selection using approximated nw_align score
+struct Endpoint
+    x::Int64
+    y::Int64
+    id::Int64
+    isBeginning::Bool
 end
 
 # Estimate pealty between kmer matches x and y
@@ -32,77 +72,10 @@ end
     return abs(m - n) * gap_score_estimate + min(m, n) * match_score_estimate
 end
 
-function SampleMetrics(X::Vector{Int64}, Y::Vector{Int64})
-    length(X) == length(Y) || error("Vectors must be of equal length.")
-    n = length(X)
-    meanX = sum(X) / n
-    meanY = sum(Y) / n
-    nVarX = sum(abs2, X .- meanX) #matchCount * variance of A
-    nVarY = sum(abs2, Y .- meanY) #matchCount * variance of B
-    dotXY = 0
-    @inbounds @simd for i in 1:length(X)
-        dotXY += X[i] * Y[i]
-    end
-    correlation = (dotXY - n * meanX * meanY) / sqrt(nVarX * nVarY)
-    return SampleMetrics(n, meanX, meanY, nVarX, nVarY, Float64(dotXY), correlation)
-end
-
-# TODO benchmark if these benefit from inline
-function remove_point(s::SampleMetrics, x::Int64, y::Int64)
-    n = s.n - 1
-    meanX = (s.n * s.meanX - x) / n
-    meanY = (s.n * s.meanY - y) / n
-    nVarX = s.nVarX - (s.n / n) * (x - s.meanX)^2 #newMatchCount * new variance of A
-    nVarY = s.nVarY - (s.n / n) * (y - s.meanY)^2 #newMatchCount * new variance of B
-    dotXY = s.dotXY - x*y
-    correlation = (dotXY - n * meanX * meanY) / sqrt(nVarX * nVarY)
-    return SampleMetrics(n, meanX, meanY, nVarX, nVarY, dotXY, correlation)
-end
-
-# seeding functions
-
+#kmer selection based on approximated nw_align score
 # TODO look for improvements here
-function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmerLength::Int64)
-
-    # Abbreviations
-    k = kmerLength
-    m = length(A)
-    n = length(B)
-
-    # List of all kmer matches between A and B
-    kmerMatches = KmerMatch[]
-    # Produce dictionary of all kmers in A
-    kmerDict = Dict{LongDNA{4}, Array{Int64}}()
-    for i in 1:m-k+1
-        kmer = A[i:i+k-1]
-        if kmer in keys(kmerDict)
-            push!(kmerDict[kmer], i)
-        else
-            kmerDict[kmer] = [i]
-        end
-    end
-
-    # Search B for any matching kmers
-    diagonals = fill(typemin(Int64), m+n) # diagonals[i] = the rightmost kmer in diagonal i. (used to find overlaps in matches)
-    repetitionTolerance = 5 # Threshold for ignoring repeted kmers
-    for iB in 1 : n-k+1
-        kmer = B[iB : iB+k-1]
-        if (haskey(kmerDict, kmer) && length(kmerDict[kmer]) <=  repetitionTolerance)
-            
-            #Add found match(es) to list
-            for iA in kmerDict[kmer]
-                if diagonals[iA - iB + n + 1] + k <= iA
-                    push!(kmerMatches, KmerMatch(iA, iB))
-                    diagonals[iA - iB + n + 1] = iA
-                end
-            end
-        end
-    end
-
-    return kmerMatches
-end
-
-function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::Matrix{Float64}, 
+# TODO preallocate connector kmer_matches
+function select_kmer_path(kmerMatches::Vector{KmerMatch}, m::Int64, n::Int64, match_score_matrix::Matrix{Float64}, 
     vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, extension_score::Float64, k::Int64) where {X, Y}
     
     # Produce constants used for estimating scores without A and B
@@ -118,7 +91,7 @@ function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::M
     matchCount = length(kmerMatches)
     
     #Produce list of endpoints - two for each kmer
-    endpoints = Array{Endpoint}(undef,matchCount * 2)
+    endpoints = Vector{Endpoint}(undef,matchCount * 2)
     for i in 1 : matchCount
         match = kmerMatches[i] 
         endpoints[2 * i - 1] = Endpoint(match.posA, match.posB, i, true)
@@ -127,13 +100,13 @@ function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::M
     sort!(endpoints, by = e -> (e.x, e.y, e.isBeginning))
     
     # Transitions
-    bestConnections = Array{Int64}(undef, matchCount)
-    bestScores = Array{Float64}(undef, matchCount)
+    bestConnections = Vector{Int64}(undef, matchCount)
+    bestScores = Vector{Float64}(undef, matchCount)
 
     #Chains speed up the DP
     chainNum = 0
     chains = Vector{Vector{Int64}}() # Disjoint sequences of compatible kmers
-    chainIds = Array{Int64}(undef, matchCount) # The chain of each kmer
+    chainIds = Vector{Int64}(undef, matchCount) # The chain of each kmer
     occupiedChains = Vector{Bool}() # chains with recently added kmers
     chainLinks = Vector{Vector{Int64}}() # chainLinks[x,y] = the last kmer in chain y which some kmer in chain x can connect with.
     
@@ -216,7 +189,49 @@ function select_kmer_path(kmerMatches, m::Int64, n::Int64, match_score_matrix::M
     return kmerPath
 end
 
-#Kmer selection variant algorithm
+# structs and helper methods for kmer selection based on correlation scoring
+struct SampleMetrics
+    n::Int
+    meanX::Float64
+    meanY::Float64
+    nVarX::Float64
+    nVarY::Float64
+    dotXY::Float64 # this seems to always be Int64
+    correlation::Float64
+end
+
+function SampleMetrics(X::Vector{Int64}, Y::Vector{Int64})
+    length(X) == length(Y) || error("Vectors must be of equal length.")
+    n = length(X)
+    meanX = sum(X) / n
+    meanY = sum(Y) / n
+    nVarX = sum(abs2, X .- meanX) #matchCount * variance of A
+    nVarY = sum(abs2, Y .- meanY) #matchCount * variance of B
+    dotXY = 0
+    @inbounds @simd for i in 1:length(X)
+        dotXY += X[i] * Y[i]
+    end
+    correlation = (dotXY - n * meanX * meanY) / sqrt(nVarX * nVarY)
+    return SampleMetrics(n, meanX, meanY, nVarX, nVarY, Float64(dotXY), correlation)
+end
+
+@inline function CorrelationScore(s::SampleMetrics)
+    return sqrt(s.n) * s.correlation
+end
+
+# TODO benchmark if these benefit from inline
+function remove_point(s::SampleMetrics, x::Int64, y::Int64)
+    n = s.n - 1
+    meanX = (s.n * s.meanX - x) / n
+    meanY = (s.n * s.meanY - y) / n
+    nVarX = s.nVarX - (s.n / n) * (x - s.meanX)^2 #newMatchCount * new variance of A
+    nVarY = s.nVarY - (s.n / n) * (y - s.meanY)^2 #newMatchCount * new variance of B
+    dotXY = s.dotXY - x*y
+    correlation = (dotXY - n * meanX * meanY) / sqrt(nVarX * nVarY)
+    return SampleMetrics(n, meanX, meanY, nVarX, nVarY, dotXY, correlation)
+end
+
+#Kmer selection variant algorithm based on correlation scoring
 function select_max_correlation_kmer_path(kmerMatches::Vector{KmerMatch}, k::Int64)
 
     # Initialize
