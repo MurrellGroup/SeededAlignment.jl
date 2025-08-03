@@ -25,6 +25,7 @@ This struct is typically passed to functions like `seed_chain_align` or `msa_cod
 score_params = ScoringScheme(extension_score = 0.3, mismatch_score = 0.7) # (everything else will be keept at default values)
 ```
 """
+# TODO handle stop codon
 struct ScoringScheme
 	# global extending gap penalty
 	extension_score::Float64
@@ -58,18 +59,33 @@ struct ScoringScheme
 			ArgumentError("kmer_length must be within kmer_length limits. Namely we require that:\n
 			$(kmer_length_lower_limit) <= kmer_length <= $(kmer_length_upper_limit).")
 		)
+		# TODO force diagional positive on codon_scoring
 		# TODO add some sort of restriction on scoring matricies. Like matching better than mismatching and not negative
 		
 		new(extension_score::Float64, kmer_length::Int64, edge_ext_begin::Bool, edge_ext_end::Bool,
 			nucleotide_score_matrix::Matrix{Float64}, codon_score_matrix::Matrix{Float64})
 	end
 end
-# TODO definitively need a match/mismatch constructor version because that's easier for people to configure than 20x20 matrix or 4x4
-
-# ScoringScheme construction wrapper # TODO handle stop codon
-function ScoringScheme(; extension_score::Float64=-0.4, kmer_length::Int64=18, edge_ext_begin=true::Bool, edge_ext_end=true::Bool, 
-		nucleotide_score_matrix=NUC_MATRIX, codon_score_matrix=BLOSUM62)
-
+# ScoringScheme construction wrapper
+function ScoringScheme(; 
+	extension_score::Float64=-0.4, 
+	kmer_length::Int64=18, 
+	edge_ext_begin=true::Bool, 
+	edge_ext_end=true::Bool,
+	nucleotide_mismatch_score::Float64 = -1.0,
+	nucleotide_match_score::Float64 = 0.0,
+	codon_mismatch_score::Float64 = 0.0,
+	codon_match_score::Float64 = 3.0,
+	nucleotide_score_matrix=nothing, 
+	codon_score_matrix=nothing
+)
+	# uses (mis)match_scores if no score matricies are given
+	if isnothing(nucleotide_score_matrix)
+		nucleotide_score_matrix = simple_match_penalty_matrix(nucleotide_match_score, nucleotide_mismatch_score, 4)
+	end
+	if isnothing(codon_score_matrix)
+		codon_score_matrix = simple_match_penalty_matrix(codon_match_score, codon_match_score, 20)
+	end
 	# call actual constructor
 	ScoringScheme(extension_score::Float64, kmer_length::Int64, edge_ext_begin::Bool, edge_ext_end::Bool,
 		nucleotide_score_matrix::Matrix{Float64}, codon_score_matrix::Matrix{Float64})
@@ -85,7 +101,7 @@ function show(io::IO, s::ScoringScheme)
 end
 
 # matrix constructor helper method
-function simple_match_penalty_matrix(match_score, mismatch_score, n=4)
+function simple_match_penalty_matrix(match_score::Float64, mismatch_score::Float64, n::Int64)
     m = fill(mismatch_score, n, n)
     for i in 1:n
         m[i,i] = match_score
@@ -95,29 +111,14 @@ end
 
 # default movesets and ScoringSchemes
 
-"""
-    std_codon_scoring()
-
-Return a standard codon-aware `ScoringScheme` for alignment.
-
-# Returns
-- `ScoringScheme`: Default scoring parameters for codon alignment.
-
-# Parameters
-- Match score: `0.0`
-- Mismatch score: `0.3`
-- Gap extension score: `0.1`
-- Allow extension at sequence ends: `true` (both ends)
-- K-mer length for seeding: `18`
-
-Use this as a default `ScoringScheme` for codon-preserving alignments.
-"""
-# TODO handle stop codon, better score matricies
+# TODO handle stop codon
 const STD_SCORING = ScoringScheme(
 	extension_score=-0.5,
 	kmer_length=15,
 	edge_ext_begin=true,
 	edge_ext_end=true,
-	nucleotide_score_matrix=NUC_MATRIX,
-	codon_score_matrix=BLOSUM62
+	nucleotide_mismatch_score = -0.5,
+	nucleotide_match_score = 0.0,
+	codon_mismatch_score = 0.0, # FIXME this parameter doesn't really work in practice. Works as if always equal 0
+	codon_match_score = 3.0
 )

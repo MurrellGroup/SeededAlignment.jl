@@ -75,7 +75,7 @@ end
 #kmer selection based on approximated nw_align score
 # TODO look for improvements here
 # TODO preallocate connector kmer_matches
-@inbounds @fastmath function select_kmer_path(kmerMatches::Vector{KmerMatch}, m::Int64, n::Int64, match_score_matrix::Matrix{Float64}, 
+function select_kmer_path(kmerMatches::Vector{KmerMatch}, m::Int64, n::Int64, match_score_matrix::Matrix{Float64}, 
     vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, extension_score::Float64, k::Int64) where {X, Y}
     
     # Produce constants used for estimating scores without A and B
@@ -232,7 +232,7 @@ function remove_point(s::SampleMetrics, x::Int64, y::Int64)
 end
 
 #Kmer selection variant algorithm based on correlation scoring
-@inbounds @fastmath function select_max_correlation_kmer_path(kmerMatches::Vector{KmerMatch}, k::Int64)
+function select_max_correlation_kmer_path(kmerMatches::Vector{KmerMatch}, k::Int64)
 
     # Initialize
     matchCount = length(kmerMatches)

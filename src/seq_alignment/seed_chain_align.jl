@@ -125,7 +125,7 @@ end
         end
         result .*= [A[new_posA : new_posA + k - 1], B[new_posB : new_posB + k - 1]]
         prevA = new_posA
-        prevB = new_posA
+        prevB = new_posB
     end
     # align the remaining parts of the sequences - without cleaning frameshifts
     alignment = _nw_align(A[prevA + k : end], B[prevB + k : end], vgap_moves, hgap_moves, 

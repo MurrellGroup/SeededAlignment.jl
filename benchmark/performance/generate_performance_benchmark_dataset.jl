@@ -4,8 +4,6 @@ Random.seed!(42)
 
 # ATTENTION: Please run from top directory of package!
 include("./../noising.jl")
-# TODO make it easier to customize similarity and such
-
 # sequence_length
 const seqlength = 2001
 const num_seqs = 50
@@ -14,7 +12,7 @@ dataset = Vector{LongDNA{4}}(undef, num_seqs+1)
 # ref sequence
 ref = generate_random_ref(seqlength÷3)
 dataset[1] = ref
-# generate shared mutations 
+# generate shared mutations
 # TODO stack mutations for more complex alignment dataset
 shared_mutation = mutateSequence(ref,
     codon_indel_avg=5.0,
@@ -29,5 +27,6 @@ end
 write_fasta("./benchmark/performance/benchmark_input_sequences.fasta", dataset)
 msa = msa_codon_align(ref, dataset[2:end], use_seeded=true)
 write_fasta("./benchmark/performance/benchmarked_msa_result.fasta", msa)
-msa = msa_codon_align(ref, dataset[2:end], use_seeded=false)
-write_fasta("./benchmark/performance/benchmarked_msa_result.fasta", msa)
+# compare with nw_align
+#msa = msa_codon_align(ref, dataset[2:end], use_seeded=false)
+#write_fasta("./benchmark/performance/benchmarked_msa_result.fasta", msa)

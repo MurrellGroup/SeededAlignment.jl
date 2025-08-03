@@ -80,8 +80,6 @@ const NUC_MATRIX = [
 ]
 
 ## helper functions ##
-
-# TODO unit test toInt functions
 # Convert NucleicAcid to integer: A -> 1, C -> 2, G -> 3, T -> 4
 @inline toInt(x::NucleicAcid) = Int(trailing_zeros(BioSequences.compatbits(x)))+1 # decodes ambigious nucleotides badly
 @inline toInt(aa::AminoAcid)::Int = Int(trailing_zeros(BioSequences.compatbits(aa)))+1
