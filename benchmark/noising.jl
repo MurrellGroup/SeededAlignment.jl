@@ -74,7 +74,7 @@ function mutateSequence(org_seq::LongDNA{4};
     return seq
 end
 
-function frameshift_noise_seq!(seq::LongDNA{4}; frameshift_indel_avg::Float64=3.0)
+function frameshift_noise_seq!(seq::LongDNA{4}; frameshift_indel_avg::Float64=3.0) # TODO Investigate why frameshift insertions look werid...
     n = length(seq)
     dna = LongDNA{4}("ACGT")
     num_frameshifts = rand(Poisson(frameshift_indel_avg))
@@ -102,19 +102,29 @@ function frameshift_noise_seq(seq::LongDNA{4}; frameshift_indel_avg::Float64=3.0
     num_frameshifts = rand(Poisson(frameshift_indel_avg))
     new_seq = copy(seq)
     # insertion/deletion mutations
+    indel_indicies = Int64[]
+    del_indicies = Int64[]
+    insert_indicies = Int64[]
     for i in 1:num_frameshifts
-        indel_pos = rand(1:(n-4)÷3)
+        indel_pos = rand(2:(n-1))
+        push!(indel_indicies, indel_pos)
         a = rand(Bool)
         if a
             # insertion
-            new_seq = new_seq[1:3*indel_pos] * randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1) * new_seq[3*indel_pos + 1 : end]
+            push!(insert_indicies, indel_pos)
+            new_seq = new_seq[1:indel_pos] * randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1) * new_seq[indel_pos + 1 : end]
             n += 1
         else
             # deletion
-            deleteat!(new_seq, 3*indel_pos+1)
+            push!(del_indicies, indel_pos)
+            deleteat!(new_seq, indel_pos)
             n -= 1
         end
     end
+    println("num_frameshifts: ", num_frameshifts)
+    println("indel_indicies: ", indel_indicies)
+    println("del_indicies: ", del_indicies)
+    println("insert_indicies: ", insert_indicies)
     return new_seq
 end
 

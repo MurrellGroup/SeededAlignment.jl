@@ -113,12 +113,12 @@ end
 
 # TODO handle stop codon
 const STD_SCORING = ScoringScheme(
-	extension_score=-0.5,
+	extension_score=-0.3,
 	kmer_length=15,
 	edge_ext_begin=true,
 	edge_ext_end=true,
-	nucleotide_mismatch_score = -0.5,
+	nucleotide_mismatch_score = -0.8,
 	nucleotide_match_score = 0.0,
 	codon_mismatch_score = 0.0, # FIXME this parameter doesn't really work in practice. Works as if always equal 0
-	codon_match_score = 3.0
+	codon_match_score = 6.0
 )

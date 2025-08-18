@@ -67,25 +67,22 @@ num_seqs = length(seqs)
 # convert seqs to AA_seqs
 AA_seqs = LongAA[BioSequences.translate(seqs[i]) for i in 1:num_seqs]
 # noise the sequences bad noise
-noised_seqs = LongDNA{4}[frameshift_noise_seq(seqs[i]) for i in 1:num_seqs]
-msa = msa_codon_align(ref, noised_seqs, codon_scoring_on=false)
-write_fasta(".fasta_output/denoised_codon_msa.fasta", msa)
+noised_seqs = LongDNA{4}[frameshift_noise_seq(seqs[i], frameshift_indel_avg = 1.0) for i in 1:num_seqs]
+msa = msa_codon_align(ref, noised_seqs, codon_scoring_on=true, use_seeded=true)
+write_fasta("msa.fasta",msa)
 noised_AA_seqs = LongAA[BioSequences.translate(ungap(msa[i+1])) for i in 1:num_seqs]
 levenshtein_distances = Int64[levenshtein(noised_AA_seqs[i], AA_seqs[i]) for i in 1:num_seqs]
 # Create a histogram
 hist = histogram(levenshtein_distances, bins=5, xlabel="AA_levenshtein_distance", ylabel="hits", title="seed_chain_align - protein seq denoising")
-display(hist)
+display(hist) #may not be displayed correctly if called in repl
 savefig("seed_histogram.png")
 # show differences 
-# TODO 1 or 2 sequences get werid result. Investigate why.
 for i in 1:num_seqs
     cur_denoised = noised_AA_seqs[i]
     cur_ref = AA_seqs[i]
-    @show length(cur_denoised)
-    @show length(cur_ref)
     @assert length(cur_denoised) == length(cur_ref)
     for j in 1:length(cur_ref)
-        if cur_ref[j] != cur_denoised[j] && (cur_denoised[j] != AminoAcid('X'))
+        if cur_ref[j] != cur_denoised[j] #&& (cur_denoised[j] != AminoAcid('X')) for investigating...
             println("seqId: ",i)
             println("codon_index: ", j)
             if j-5 > 0 && length(AA_seqs[i]) > j+5
@@ -109,6 +106,7 @@ write_fasta(".fasta_output/pairwise_comparison.fasta", (target_alignment..., src
 #= 2. How well does seed_chain_align recover the "true alignment" on a nucleotide level? (EXTRA)
 ________________________________________________________________________________________________________________=#
 #collect sequnces and ungap sequence 
+println("the following compares the similarity of the pairwise alignments from nw_align and seed_chain_align")
 names, ref_and_seqs = read_fasta("./benchmark/alignment_quality/msa_codon_align.fasta")
 rng = RandomDevice()
 idx = rand(rng, 2:num_seqs)
