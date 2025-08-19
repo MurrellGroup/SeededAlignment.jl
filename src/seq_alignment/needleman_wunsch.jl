@@ -1,14 +1,43 @@
 """ 
-    
-    nw_align(A::LongDNA{4},B::LongDNA{4}; moveset::Moveset=STD_NOISY_MOVESET, scoring::ScoringScheme=STD_SCORING
-    
-Needleman_Wunsch wrapper - no reference, i.e. makes no assumptions about the two sequences. 
+	nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=STD_NOISY_MOVESET, scoring::ScoringScheme=STD_SCORING)
 
-Computes an optimal global pairwise alignment of two ungapped `LongDNA{4}` sequence  
-with respect to the `Moveset` and the `ScoringScheme`. 
+(Needleman-wunsch wrapper - DE-NOVO)
 
+Computes an optimal global pairwise alignment of the two ungapped DNA sequences `A` and `B`. This is done purely semantically without any awareness of protein encoding.
+
+# Extended Help
+
+# Arguments
+
+- `A::LongDNA{4}`: 1st DNA sequence to be aligned
+- `B::LongDNA{4}`: 2nd DNA sequence to be aligned
+- `moveset::Moveset=STD_NOISY_MOVESET`: Defines allowable alignment moves (e.g. insertions/deletions and their penalty)
+- `scoring::ScoreScheme=STD_SCORING`: Defines alignment scoring together with moveset
+
+# Returns
+
+- `Tuple{LongDNA{4},LongDNA{4}}`: Tuple representation of pairwise alignment of DNA sequences `A` and `B`.
+
+# Examples
+```julia
+A = LongDNA{4}("AATGCTC")
+B = LongDNA{4}("ACATGTC")
+# produce alignment 
+alignment = nw_align(A, B)
+println(alignment)
+#= resulting alignment:
+
+alignment = (
+	LongDNA{4}("A-ATGCTC"), 
+	LongDNA{4}("ACATG-TC")
+)
+
+=#
+```
 """
-function nw_align(A::LongDNA{4}, B::LongDNA{4}; 
+function nw_align(
+    A::LongDNA{4}, 
+    B::LongDNA{4}; 
     moveset::Moveset = STD_NOISY_MOVESET, 
     scoring::ScoringScheme = STD_SCORING
 )   
@@ -36,26 +65,51 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4};
 end
 
 """ 
-    
-    nw_align(; 
-        ref::LongDNA{4}, 
-        query::LongDNA{4}, 
-        moveset::Moveset = STD_CODON_MOVESET, 
-        scoring::ScoringScheme = STD_SCORING,
-        codon_scoring_on::Bool = true,
-        do_clean_frameshifts::Bool = false, 
-        verbose::Bool = false
-)
+	nw_align(; 
+        	ref::LongDNA{4}, 
+        	query::LongDNA{4}, 
+        	moveset::Moveset = STD_CODON_MOVESET, 
+        	scoring::ScoringScheme = STD_SCORING,
+        	codon_scoring_on::Bool = true,
+        	do_clean_frameshifts::Bool = false, 
+        	verbose::Bool = false)
 
+(Needleman-wunsch wrapper - CODING given trusted CDS anchor/reference)
 
-Needleman_Wunsch wrapper - reference informed, i.e. assumes one of the sequence has intact reading frame. 
+Produces an optimal global pairwise alignment of two ungapped CDS (Coding DNA Sequences) `ref` and `query` by using an `ref` as an anchor to determine the apprioate reading frame coordinates for `query`. 
 
-Optimally aligns a `query` sequence to a `ref` sequence using a codon-aware `Moveset` and `ScoringScheme`.
-
-**NOTE** We always assume the readingFrame is 1
+# Extended Help
 
 # Arguments
+- `ref::LongDNA{4}`: Anchored trusted CDS which decides the reading frame coordinates in the alignment
+- `query::LongDNA{4}`: CDS (with possible frameshifts due to e.g. sequencing or annotation errors) which is aligned to `ref` and adopts its reading frame coordinates. 
+- `moveset::Moveset = STD_CODON_MOVESET`: Defines allowable alignment moves (e.g. insertions/deletions and their penalty)
+- `scoring::ScoringScheme = STD_SCORING`: Defines alignment scoring together with moveset
+- `codon_scoring_on::Bool = true`: Whether to apply additional scoring on codon-level 
+- `do_clean_frameshifts::Bool = false`: Whether to clean the alignment output of gaps which cause frameshifts (IMPORTANT: produces a protein alignment on a nucleotide level)
+- `verbose::Bool = false`: Whether to verbosely display what edits were made during the cleaning of frameshifts. 
 
+# Returns
+- `Tuple{LongDNA{4},LongDNA{4}}`: Tuple representation of pairwise alignment of DNA sequences `ref` and `query`. 
+Note that this represents a protein alignment on a nucleotide level if `(do_clean_frameshifts == true)`.
+
+# Examples
+```julia
+anchor_CDS =    LongDNA{4}("ATGCCAGTA")
+# untrusted_CDS may contain some frameshift errors due to e.g. sequencing or annotation errors.
+untrusted_CDS = LongDNA{4}("ATGTA") 
+# frameshift errors are removed from the cleaned alignment
+cleaned_CDS_alignment = nw_align(ref=anchor_CDS, query=untrusted_CDS, clean_frameshifts=true)
+println(cleaned_CDS_alignment)
+#= resulting alignment:
+
+cleaned_CDS_alignment = (
+	LongDNA{4}("ATGCCAGTA"), 
+	LongDNA{4}("ATG---NTA")
+)
+Here 'N' denotes ambigious nucleotide.
+=#
+```
 """
 function nw_align(; 
     ref::LongDNA{4}, 
@@ -129,7 +183,7 @@ end
                 # performance optimized translation
                 ref_AA = fast_translate((A2[column_index-3],A2[column_index-2],A2[column_index-1]))
                 seq_AA = fast_translate((B2[row_index-3],B2[row_index-2],B2[row_index-1]))
-                # TODO handle stop codons
+                # handle stop codons 
                 if ref_AA != stop_aa && seq_AA != stop_aa
                     # get codon_mismatch_score
                     codon_match_score = codon_score_matrix[toInt(ref_AA),toInt(seq_AA)]
@@ -396,7 +450,7 @@ end
     # return alignment
     return aligned_A, aligned_B
 end
-# Didn't give a noticible performance boost
+# Didn't give noticiable performance boost
 @inline function fast_simpler_isapprox(a::Float64, b::Float64; eps::Float64=1e-5)
     return abs(a - b) < eps
 end

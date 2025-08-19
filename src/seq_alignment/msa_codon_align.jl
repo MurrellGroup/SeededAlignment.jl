@@ -1,26 +1,48 @@
 """
-    msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; 
-        moveset::Moveset=STD_CODON_MOVESET, 
-        scoring::ScoringScheme=STD_SCORING, 
-        codon_scoring_on=true::Bool)
+    msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, codon_scoring_on=true::Bool)
 
-Aligns a set of DNA sequences to a codon-level reference using seeded pairwise alignment and frame-aware cleanup.
+Computes a visual global MSA (multiple Sequence alignment) of coding sequences based on pairwise alignments to a trusted CDS reference `ref` used as an anchor to 
+determine the apprioate reading frame coordinates for the other coding sequences (which may contain frameshift errors). Possible frameshifts errors in the 
+pairwise alignments are cleaned up and then scaffolded to create a multiple sequence alignment. This is done by left-stacking codon insertions relative to 
+the reference. 
 
-This function performs pairwise alignments of all sequences in `seqs` to the codon-aware reference `ref`, 
-using the provided `moveset` and `scoring` scheme. It then cleans the alignments to remove frameshift violations, 
-and constructs a multiple sequence alignment (MSA) by resolving codon insertion ambiguities through left-stacking relative to the reference.
+Note that this doesn't qualify as a proper multiple sequence alignment in the traditional sense since the aligned sequences are only scored as being 
+aligned against the reference sequnece and not each other. 
+
+Even so, it can still provides a useful visualization or approximation for a protein multiple sequence alignment on a nucleotide level. 
+
+# Extended Help
 
 # Arguments
-- `ref::LongDNA{4}`: The codon-aware reference sequence used for alignment.
-- `seqs::Vector{LongDNA{4}}`: A vector of sequences to align to the reference.
+- `ref::LongDNA{4}`: Anchored trusted CDS which decides the reading frame coordinates in the alignment
+- `seqs::Vector{LongDNA{4}}`: Coding Sequences (with possible frameshifts due to e.g. sequencing or annotation errors) which are aligned to `ref` and adopts its reading frame coordinates. 
 - `moveset::Moveset=STD_CODON_MOVESET`: Defines allowable alignment moves (e.g., codon insertions/deletions).
 - `scoring::ScoringScheme=STD_SCORING`: The scoring scheme used during alignment.
-- `codon_scoring_on::Bool=true`: Whether to apply codon-level scoring (rather than per-nucleotide).
+- `codon_scoring_on::Bool=true`: Whether to apply additional scoring on codon-level 
 
 # Returns
-- `msa::Vector{LongDNA{4}}`: a frameshift-free multiple sequence alignment 
+- `msa::Vector{LongDNA{4}}`: a frameshift-free multiple sequence alignment
 
-# Examples
+# Example
+
+1. codon alignment with no frameshifts present in inputs 
+
+```julia
+ref =  LongDNA{4}("ATGTTTCCCGGGTAA")
+seq1 = LongDNA{4}("ATGTTTTTTCCCGGGTAA")
+seq2 = LongDNA{4}("ATGATGTTTTTTCCCGGGTAAGGG")
+seq3 = LongDNA{4}("ATGCCCGGG")
+
+msa = msa_codon_align(ref, [seq1,seq2,seq3])
+#= alignment results:
+
+msa[1] == LongDNA{4}("---ATG---TTTCCCGGGTAA---")
+msa[2] == LongDNA{4}("---ATGTTTTTTCCCGGGTAA---")
+msa[3] == LongDNA{4}("ATGATGTTTTTTCCCGGGTAAGGG")
+msa[4] == LongDNA{4}("---ATG------CCCGGG------")
+
+=#
+```
 
 """
 function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; 

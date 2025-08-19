@@ -1,12 +1,25 @@
 
 """
-    clean_frameshifts(aligned_ref::LongDNA{4},aligned_seq::LongDNA{4}; verbose::Bool=false)
+    clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; verbose::Bool=false)
 
-Takes a pairwise alignment of a reference (with known reading frame) and a sequence, and removes frameshift mutations 
-which don't respect the reference's reading frame. This is done by removing insertions from the alignment or inserting 
+(clean_frameshifts - cleans pairwise alignments of frameshifts)
+
+Takes a global pairwise alignment of a CDS anchor/reference `aligned_ref` and a CDS that may contain frameshift errors `aligned_seq`, and removes frameshift mutations 
+which don't respect the reference's reading frame in the alignment. This is done by removing insertions from the alignment or inserting 
 ambigious nucleotides into deletions.
 
-# Examples:
+# Extended Help
+
+# Arguments
+- `aligned_ref::LongDNA{4}`: aligned anchored trusted CDS which decides the reading frame coordinates in the alignment
+- `aligned_seq::LongDNA{4}`: aligned CDS (with possible frameshifts due to e.g. sequencing or annotation errors) which is aligned to `ref` and adopts its reading frame coordinates
+- `verbose::Bool`: Whether to verbosely display what edits were made during the cleaning of frameshifts
+
+# Returns
+- `Tuple{LongDNA{4},LongDNA{4}}`: Cleaned global pairwise alignment that represents a protein alignment on a nucleotide level 
+
+# Examples
+```
 1. insertion
 ref: ATG-AACGTA  -> cleaned_ref: ATGAACGTA 
 seq: ATGTAACGTA  -> cleaned_seq: ATGAACGTA
@@ -15,7 +28,10 @@ seq: ATGTAACGTA  -> cleaned_seq: ATGAACGTA
 ref: ATGAACGTA  -> cleaned_ref: ATGAACGTA
 seq: ATG-ACGTA  -> cleaned_seq: ATGNACGTA
 
-**NOTE** We always assume the readingFrame is 1
+3. longer deletion
+ref: ATGAACGTA  -> cleaned_ref: ATGAACGTA
+seq: AT-----TA  -> cleaned_seq: ATN---NTA
+```
 """
 function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; verbose::Bool=false)
     # get ref sequence
@@ -182,7 +198,44 @@ function _clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; ve
     return cleaned_ref, cleaned_seq
 end
 """
-clean a multiple sequence alignment provided one of the sequence is a reference sequence
+    clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seqs::Vector{LongDNA{4}})
+
+(clean_frameshifts - cleans multiple sequence alignments of frameshifts)
+
+Clean a multiple sequence alignment provided one of the sequence is a reference sequence. This is done by projecting the multiple sequence alignment to 
+a collection of pairwise alignments relative to the reference `aligned_ref`; cleaning those and then scaffolding the results to recover a cleaned multiple sequence alignment.
+
+# Extended Help
+
+# Arguments
+- `aligned_ref::LongDNA{4}`: aligned anchored trusted CDS which decides the reading frame coordinates in the alignment
+- `aligned_seqs::LongDNA{4}`: aligned coding sequences (with possible frameshifts due to e.g. sequencing or annotation errors) which are aligned to `ref` and adopts its reading frame coordinates
+
+# Returns
+- `cleaned_msa::Vector{LongDNA{4}}`: a frameshift-free multiple sequence alignment
+
+# Example
+
+```julia
+aligned_seqs = Vector{LongDNA{4}}(undef, 4)
+# original unclean msa
+            aligned_ref =     LongDNA{4}("ATG---TTTCCCGGGT-AA")
+            aligned_seqs[1] = LongDNA{4}("-TG------CCCGGGT-A-")
+            aligned_seqs[2] = LongDNA{4}("ATGAAATTTCCCGGGT-AA")
+            aligned_seqs[3] = LongDNA{4}("ATGAAA----CCGGGT-AA")
+            aligned_seqs[4] = LongDNA{4}("ATG---TTTCCCGGGTTAA")
+# produce clean msa
+cleaned_msa = clean_frameshifts(aligned_ref, aligned_seqs)
+#= results
+            cleaned_msa[1] = LongDNA{4}("ATG---TTTCCCGGGTAA") # ref sequence
+            cleaned_msa[2] = LongDNA{4}("NTG------CCCGGGTAN")
+            cleaned_msa[3] = LongDNA{4}("ATGAAATTTCCCGGGTAA")
+            cleaned_msa[4] = LongDNA{4}("ATGAAA---NCCGGGTAA")
+            cleaned_msa[5] = LongDNA{4}("ATG---TTTCCCGGGTAA")
+
+=#
+```
+
 """
 function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seqs::Vector{LongDNA{4}})
     # exception handling

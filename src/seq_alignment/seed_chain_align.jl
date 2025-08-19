@@ -1,10 +1,41 @@
 """
-    seed_chain_align(A::LongDNA{4},B::LongDNA{4}; moveset::Moveset=STD_NOISY_MOVESET, scoring::ScoringScheme=STD_SCORING
-    
-seed_chain_align wrapper - no reference, i.e. makes no assumptions about the two sequences. 
 
-Computes a heuristically guided global pairwise alignment of two ungapped `LongDNA{4}` sequence based on seeding. The seeds are then joined together 
-by doing a partial alignment with nw_align between seeds optimally with repect to the `Moveset` and `ScoringScheme`.
+    seed_chain_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset=STD_NOISY_MOVESET, scoring::ScoringScheme=STD_SCORING)
+
+(SeededAlignment wrapper - DE-NOVO)
+
+Computes a heuristically guided global pairwise alignment of two ungapped DNA sequence `A` and `B` based on seeding heuristic. The seeds are then joined together 
+by computing an optimal partial alignment between seeds with the Needleman-Wunsch algorithm (nw_align). Optimal in this context meaning with repect to the choosen `Moveset` and `ScoringScheme`.
+
+The advantage of this method is that it is much faster than nw_align and produces similar results for most usecases. 
+
+# Extended Help
+
+# Arguments
+- `A::LongDNA{4}`: 1st DNA sequence to be aligned
+- `B::LongDNA{4}`: 2nd DNA sequence to be aligned
+- `moveset::Moveset=STD_NOISY_MOVESET`: Defines allowable alignment moves (e.g. insertions/deletions and their penalty)
+- `scoring::ScoreScheme=STD_SCORING`: Defines alignment scoring together with moveset
+
+# Returns
+- `Tuple{LongDNA{4},LongDNA{4}}`: Tuple representation of pairwise alignment of DNA sequences `A` and `B`.
+
+# Example
+```julia
+# input sequences with no reading frame assumed
+A = LongDNA{4}("AATGCTC")
+B = LongDNA{4}("ACATGTC")
+# produce alignment
+alignment = seed_chain_align(A, B)
+println(alignment)
+#= resulting alignment
+alignment = (
+	LongDNA{4}("A-ATGCTC"), 
+	LongDNA{4}("ACATG-TC")
+)
+=#
+```
+
 """
 function seed_chain_align(A::LongDNA{4}, B::LongDNA{4};
     moveset::Moveset = STD_NOISY_MOVESET,
@@ -34,14 +65,56 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4};
 end
 
 """ 
-    
-    seed_chain_align(; ref::LongDNA{4}, query::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING,
-        do_clean_frameshifts=false::Bool, verbose=false::Bool, codon_scoring_on=true::Bool)
+    seed_chain_align(; 
+        	ref::LongDNA{4}, 
+        	query::LongDNA{4}, 
+        	moveset::Moveset = STD_CODON_MOVESET, 
+        	scoring::ScoringScheme = STD_SCORING,
+        	codon_scoring_on::Bool = true,
+        	do_clean_frameshifts::Bool = false, 
+        	verbose::Bool = false)
 
-seed_chain_align wrapper - reference informed, i.e. assumes one of the sequence has intact reading frame. 
+(SeededAlignment wrapper - CODING given trusted CDS anchor/reference)
 
-Heuristically aligns a `query` sequence to a `ref` sequence based on seeding. The seeds are then joined together 
-by doing a partial alignment with nw_align between seeds optimally with repect to a codon-aware `Moveset` and `ScoringScheme`.
+Computes a heuristically guided global pairwise alignment of two ungapped CDS (Coding DNA Sequences) `ref` and `query` by using `ref` as an anchor to determine the apprioate reading frame
+coordinates for `query` and using a seeding heuristic for speedup. The seeds are then joined together by computing an optimal partial alignment between 
+seeds with the Needleman-Wunsch algorithm (nw_align). Optimal in this context means optimal with repect to the choosen `Moveset` and `ScoringScheme`.
+
+The advantage of this method is that it is much faster than nw_align and produces similar results for most usecases. 
+
+# Extended Help
+
+# Arguments
+- `ref::LongDNA{4}`: Anchored trusted CDS which decides the reading frame coordinates in the alignment
+- `query::LongDNA{4}`: CDS (with possible frameshifts due to e.g. sequencing errors) which is aligned to `ref` and adopts its reading frame coordinates. 
+- `moveset::Moveset = STD_CODON_MOVESET`: Defines allowable alignment moves (e.g. insertions/deletions and their penalty)
+- `scoring::ScoringScheme = STD_SCORING`: Defines alignment scoring together with moveset
+- `codon_scoring_on::Bool = true`: Whether to apply additional scoring on codon-level 
+- `do_clean_frameshifts::Bool = false`: Whether to clean the alignment output of gaps which cause frameshifts - this produces a protein alignment on a nucleotide level. 
+- `verbose::Bool = false`: Whether to verbosely display what edits were made during the cleaning of frameshifts. 
+
+# Returns
+- `Tuple{LongDNA{4},LongDNA{4}}`: Tuple representation of pairwise alignment of DNA sequences `ref` and `query`. 
+Note that this represents a protein alignment on a nucleotide level if `(do_clean_frameshifts == true)`.
+
+# Example
+```julia
+anchor_CDS =    LongDNA{4}("ATGCCAGTA")
+# untrusted_CDS may contain some frameshift errors due to e.g. sequencing or annotation errors.
+untrusted_CDS = LongDNA{4}("ATGTA") 
+# frameshift errors are removed from the cleaned alignment
+cleaned_CDS_alignment = seed_chain_align(ref=anchor_CDS, query=untrusted_CDS, clean_frameshifts=true)
+println(cleaned_CDS_alignment)
+#= resulting alignment:
+
+cleaned_CDS_alignment = (
+	LongDNA{4}("ATGCCAGTA"), 
+	LongDNA{4}("ATG---NTA")
+)
+Here 'N' denotes ambigious nucleotide.
+=#
+```
+
 """
 function seed_chain_align(; 
     ref::LongDNA{4},
@@ -83,7 +156,7 @@ end
     edge_ext_end = scoring.edge_ext_end
     # seeding heuristic
     kmerMatches = find_kmer_matches(A, B, k)
-    # two possible seeding heuristics # TODO compare performance of these
+    # two possible seeding heuristics
     kmerPath = select_kmer_path(kmerMatches, length(A), length(B), match_score_matrix, vgap_moves, hgap_moves, extension_score, k)
     #kmerPath = select_max_correlation_kmer_path(kmerMatches, k)
     # parameters for joining kmers/seeds
