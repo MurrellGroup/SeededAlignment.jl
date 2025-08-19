@@ -148,13 +148,16 @@ end
 
 Constants that represents the default codon moveset with frameshift moves allowed
 
+# default parameter values
+
+```julia
 const STD_CODON_MOVESET = Moveset(
     (
         Move(ref=false, step_length=1, score=-2.0, extendable=true),
         Move(ref=true,  step_length=3, score=-1.0, extendable=true)
     )
 )
-
+```
 """
 const STD_CODON_MOVESET = Moveset(
     (

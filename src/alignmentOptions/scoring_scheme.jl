@@ -1,28 +1,32 @@
 """
-```julia
-ScoringScheme(; match_score=0.0, mismatch_score=0.5,extension_score=0.1,edge_ext_begin=true,edge_ext_end=true,kmerlength=21)
-```
+	ScoringScheme(;
+		extension_score::Float64=-0.3,
+		kmer_length::Int64=15,
+		edge_ext_begin::Bool=true,
+		edge_ext_end::Bool=true,
+		nucleotide_match_score::Float64 = 0.0,
+		nucleotide_mismatch_score::Float64 = -0.8,
+		codon_match_bonus_score::Float64 = 6.0
+)
 
-A struct for storing scoring parameters used for sequence alignment. Uses a keyword constructor. 
+....# Description
+`ScoringScheme` defines how matches, mismatches, and gaps are scored during nucleotide-level sequence alignment. 
+A struct for storing scoring parameters for alignment methods. E.g. nw_align, seed_chain_align and msa_codon_align.
+
+This struct is typically passed to functions like `seed_chain_align`, `nw_align` and `msa_codon_align`.
 
 # Fields
-- `match_score::Float64`: Score (typically ≤ 0) awarded for matching nucleotide. Lower is better.
-- `mismatch_score::Float64`: Penalty for nucleotide mismatches. Higher values penalize substitutions more strongly.
-- `extension_score::Float64`: Cost to extend a gap (indel). Affects how gaps are penalized during alignment.
-
-- `edge_ext_begin::Bool`: If `true`, allows gaps to be extended at the **beginning** of sequences.
-- `edge_ext_end::Bool`: If `true`, allows gaps to be extended at the **end** of sequences.
-
-- `kmerlength::Int64`: Length of k-mers used for seeding alignments (if applicable). Ignored if no seeding is used.
-
-# Description
-`ScoringScheme` defines how matches, mismatches, and gaps are scored during nucleotide-level sequence alignment. 
-
-This struct is typically passed to functions like `seed_chain_align` or `msa_codon_align`.
+-`extension_score::Float64=-0.3`: 
+-`kmer_length::Int64=15`:
+-`edge_ext_begin=true`:
+-`edge_ext_end=true`:
+-`nucleotide_match_score = 0.0`:
+-`nucleotide_mismatch_score = -0.8`:
+-`codon_match_bonus_score = 6.0`:
 
 # example
 ```julia
-score_params = ScoringScheme(extension_score = 0.3, mismatch_score = 0.7) # (everything else will be keept at default values)
+score_params = ScoringScheme(extension_score = -0.2, mismatch_score = -0.7) # (everything else will be keept at default values)
 ```
 """
 struct ScoringScheme
@@ -33,12 +37,16 @@ struct ScoringScheme
 	# start and end extension bools
 	edge_ext_begin::Bool
 	edge_ext_end::Bool
-
 	# substitution scoring:
-	# row and column indicies: 1=A, 2=C, 3=G, 4=T 
-	nucleotide_score_matrix::Matrix{Float64}
-	# only used in ref-query if codon_scoring_on=true in nw_align, seed_chain_align or msa_codon_align
-	codon_score_matrix::Matrix{Float64}
+	match_nuc_score::Float64
+	mismatch_nuc_score::Float64
+	# (OPTIONAL) row and column indicies: 1=A, 2=C, 3=G, 4=T
+	# Note ScoreScheme is only stack allocated if `nothing` is provided. Providing a matrix can impact performance
+	nucleotide_score_matrix::Union{Nothing,Matrix{Float64}} 
+	# codon_match_bonus_score - only used in ref-query if codon_scoring_on=true in nw_align, seed_chain_align or msa_codon_align
+	codon_match_bonus_score::Float64
+	
+	codon_score_matrix::Union{Nothing,Matrix{Float64}}
 	# codon order: 1=F 2=L 3=S 4=Y 5=C 
 	#			   6=W 7=P 8=H 9=Q 10=R 
 	#              11=I 12=M 13=T 14=N 15=K
@@ -109,8 +117,30 @@ function simple_match_penalty_matrix(match_score::Float64, mismatch_score::Float
 end
 
 # default movesets and ScoringSchemes
+"""
+	STD_SCORING
 
-# TODO handle stop codon
+constant `ScoreScheme` that stores the default scoring parameters used in alignment methods.
+
+# default parameter values
+
+```julia
+const STD_SCORING = ScoringScheme(
+	extension_score=-0.3,
+	kmer_length=15,
+	edge_ext_begin=true,
+	edge_ext_end=true,
+	nucleotide_mismatch_score = -0.8,
+	nucleotide_match_score = 0.0,
+	codon_mismatch_score = 0.0, # TODO this parameter doesn't really work in practice. Works as if always equal 0
+	codon_match_score = 6.0
+)
+
+```
+
+
+
+"""
 const STD_SCORING = ScoringScheme(
 	extension_score=-0.3,
 	kmer_length=15,
