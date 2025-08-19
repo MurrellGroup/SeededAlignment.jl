@@ -25,7 +25,6 @@ This struct is typically passed to functions like `seed_chain_align` or `msa_cod
 score_params = ScoringScheme(extension_score = 0.3, mismatch_score = 0.7) # (everything else will be keept at default values)
 ```
 """
-# TODO handle stop codon
 struct ScoringScheme
 	# global extending gap penalty
 	extension_score::Float64
@@ -119,6 +118,6 @@ const STD_SCORING = ScoringScheme(
 	edge_ext_end=true,
 	nucleotide_mismatch_score = -0.8,
 	nucleotide_match_score = 0.0,
-	codon_mismatch_score = 0.0, # FIXME this parameter doesn't really work in practice. Works as if always equal 0
+	codon_mismatch_score = 0.0, # TODO this parameter doesn't really work in practice. Works as if always equal 0
 	codon_match_score = 6.0
 )

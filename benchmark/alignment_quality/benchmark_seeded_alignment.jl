@@ -21,12 +21,10 @@ and compute the levenshtein distance between the AA translations of the two sequ
 displayed in printouts and the computed distances are used to produce histograms for both seed_chain_align and nw_align.
     
     For (2) we treat the alignment from nw_align as the "true alignment" but the might be subject to change. We attempt to compute the % of columns matched between the 
-two alignments if possible. 
-(TODO: For our TC_scoring we assume that both alignments have the same lengths which isn't might break the scoring in rare cases).
-    
+two alignments if possible.
+
     For (3) we use the 3 MSAs from (1) - these being the "true" frameshift-free multiple sequence alignment and the MSAs made from nw_align and
-seed_chain_align respectively. We attempt to compute the SP_score and TC_score for each of the alignments. 
-(TODO: For our TC_scoring we assume that both alignments have the same lengths which isn't might break the scoring in rare cases).
+seed_chain_align respectively. We attempt to compute the SP_score and TC_score for each of the alignments.
 =#
 
 using Plots
@@ -103,38 +101,57 @@ seq = noised_seqs[18]
 target_alignment = nw_align(ref=ref, query=seq, do_clean_frameshifts=true)
 src_alignment = seed_chain_align(ref=ref, query=seq, do_clean_frameshifts=true)
 write_fasta(".fasta_output/pairwise_comparison.fasta", (target_alignment..., src_alignment...))
-#= 2. How well does seed_chain_align recover the "true alignment" on a nucleotide level? (EXTRA)
+#= 2. How well does seed_chain_align recover the "true alignment" on a nucleotide/codon level? (EXTRA)
 ________________________________________________________________________________________________________________=#
 #collect sequnces and ungap sequence 
 println("the following compares the similarity of the pairwise alignments from nw_align and seed_chain_align")
 names, ref_and_seqs = read_fasta("./benchmark/alignment_quality/msa_codon_align.fasta")
-rng = RandomDevice()
-idx = rand(rng, 2:num_seqs)
-println(idx)
+num_seqs = length(ref_and_seqs)-1
 ref = ungap(ref_and_seqs[1])
-seq = ungap(ref_and_seqs[idx])
-frameshift_noise_seq!(seq)
-target_alignment = nw_align(ref=ref, query=seq, do_clean_frameshifts=true)
-src_alignment = seed_chain_align(ref=ref, query=seq, do_clean_frameshifts=true)
-#write_fasta(".fasta_output/pairwise_comparison.fasta", (target_alignment..., src_alignment...))
-try
-    # translate to protein alignment
-    prot_target_alignment = translate_aligned_nuc_seq.(target_alignment)
-    prot_src_alignment = translate_aligned_nuc_seq.(src_alignment)
-    # get nucleotide and protein SP_score
-    nuc_matched_percentage = SP_score(target_alignment, src_alignment)
-    prot_matched_percentage = SP_score(prot_target_alignment, prot_src_alignment)
-    println("(nucleotide-level) alignment column match %: ", 100*nuc_matched_percentage)
-    println("(protein-level) alignment column match %: ", 100*prot_matched_percentage)
-catch
-    println("alignments of different dimensions couldn't be compared.\nSkipping: 2. How well does seed_chain_align recover the 'true alignment' on a nucleotide level? (EXTRA)")
-    println("target length: ", length(target_alignment[1]))
-    println("src length: ", length(src_alignment[1]))
+list_of_similarity_scores_nuc = Vector{Float64}(undef, num_seqs)
+list_of_similarity_scores_prot = Vector{Float64}(undef, num_seqs)
+for idx in 1:num_seqs
+    println("index: ", idx)
+    seq = ungap(ref_and_seqs[idx])
+    frameshift_noise_seq!(seq)
+    target_alignment = nw_align(ref=ref, query=seq, do_clean_frameshifts=true)
+    src_alignment = seed_chain_align(ref=ref, query=seq, do_clean_frameshifts=true)
+    #write_fasta(".fasta_output/pairwise_comparison.fasta", (target_alignment..., src_alignment...))
+    if length(target_alignment[1]) == length(src_alignment[1]) && length(target_alignment[2]) == length(src_alignment[2])
+        # translate to protein alignment
+        prot_target_alignment = translate_aligned_nuc_seq.(target_alignment)
+        prot_src_alignment = translate_aligned_nuc_seq.(src_alignment)
+        # get nucleotide and protein SP_score
+        nuc_matched_percentage = SP_score(target_alignment, src_alignment)
+        prot_matched_percentage = SP_score(prot_target_alignment, prot_src_alignment)
+        println("(nucleotide-level) alignment column match %: ", 100*nuc_matched_percentage)
+        println("(protein-level) alignment column match %: ", 100*prot_matched_percentage)
+        list_of_similarity_scores_nuc[idx] = nuc_matched_percentage
+        list_of_similarity_scores_prot[idx] = prot_matched_percentage
+    else
+        println("skipping - alignment dimensions don't match")
+        println("target length: ", length(target_alignment[1]))
+        println("src length: ", length(src_alignment[1]))
+        #list_of_similarity_scores_nuc[idx] = NaN
+        list_of_similarity_scores_prot[idx] = NaN
+    end
 end
+# only get stats for proteins 
+num_NaN = count(isnan, list_of_similarity_scores_prot)
+num_perfect_matches = count(x -> isapprox(x,1.0), list_of_similarity_scores_prot)
+filtered_matches = filter(!isnan, list_of_similarity_scores_prot)
+median_percent = median(filtered_matches)
+min_match_percent = minimum(filtered_matches)
+println("Summary information for protein alignments:")
+println("num_NaN: ", num_NaN)
+println("num_perfect_matches: ", num_perfect_matches)
+println("median_percent: ", median_percent)
+println("min_match_percent: ", min_match_percent)
+argmin_idx = findfirst(x -> x == min_match_percent, list_of_similarity_scores_prot)
+println("argmin index: ", argmin_idx)
 
 #=3. How well does nw_align/seed_chain_align + cleanup and scaffold strategy recover the "true protein multiple sequence alignment". (EXTRA)
 Note: This is equivalent to assessing the quality of the MSAs made from msa_codon_align.
 _________________________________________________________________________________________________________________=#
 
-# TODO implement SP_score and TC_score functions for msa and msa visability. 
-# Note this might only be implement once ParitialOrderAlignment msa is working to compare alignment quality.
+# TODO implement SP_score and TC_score functions for msa and msa visability.
