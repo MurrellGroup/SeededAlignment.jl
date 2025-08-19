@@ -9,24 +9,26 @@
 		codon_match_bonus_score::Float64 = 6.0
 )
 
-....# Description
-`ScoringScheme` defines how matches, mismatches, and gaps are scored during nucleotide-level sequence alignment. 
-A struct for storing scoring parameters for alignment methods. E.g. nw_align, seed_chain_align and msa_codon_align.
+`ScoringScheme` defines how matches, mismatches, and partially how  gaps are scored during sequence alignment. Beyond
+alignment operations governed by `Moveset` it encompasses everything else we can customize about the alignment process. 
 
 This struct is typically passed to functions like `seed_chain_align`, `nw_align` and `msa_codon_align`.
 
 # Fields
--`extension_score::Float64=-0.3`: 
--`kmer_length::Int64=15`:
--`edge_ext_begin=true`:
--`edge_ext_end=true`:
--`nucleotide_match_score = 0.0`:
--`nucleotide_mismatch_score = -0.8`:
--`codon_match_bonus_score = 6.0`:
+-`extension_score::Float64=-0.3`: penalty for affinely extending a gap that is already open. 
+-`kmer_length::Int64=15`: length of seeds used in seed_chain_align
+-`edge_ext_begin=true`: Whether to subsidize gaps in begining of the alignment
+-`edge_ext_end=true`: Whether to subsidize gaps in end of the alignment
+-`nucleotide_match_score = 0.0`: score awarded for matching nucleotides (has to be >= 0)
+-`nucleotide_mismatch_score = -0.8`: penalty for matching distinct nucleotides (has to be < 0)
+-`codon_match_bonus_score = 6.0`: score awarded for matching codons
 
 # example
 ```julia
 score_params = ScoringScheme(extension_score = -0.2, mismatch_score = -0.7) # (everything else will be keept at default values)
+A = LongDNA{4}("ATGATGATAA")
+B = LongDNA{4}("ATGACCCGATAA")
+seed_chain_align(A,B scoring=score_params)
 ```
 """
 struct ScoringScheme
