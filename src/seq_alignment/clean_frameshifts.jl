@@ -210,6 +210,7 @@ a collection of pairwise alignments relative to the reference `aligned_ref`; cle
 # Arguments
 - `aligned_ref::LongDNA{4}`: aligned anchored trusted CDS which decides the reading frame coordinates in the alignment
 - `aligned_seqs::LongDNA{4}`: aligned coding sequences (with possible frameshifts due to e.g. sequencing or annotation errors) which are aligned to `ref` and adopts its reading frame coordinates
+- `verbose::Bool`: Whether to verbosely display what edits were made during the cleaning of frameshifts
 
 # Returns
 - `cleaned_msa::Vector{LongDNA{4}}`: a frameshift-free multiple sequence alignment
@@ -237,7 +238,7 @@ cleaned_msa = clean_frameshifts(aligned_ref, aligned_seqs)
 ```
 
 """
-function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seqs::Vector{LongDNA{4}})
+function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seqs::Vector{LongDNA{4}}; verbose=false)
     # exception handling
     !any(
         length(aligned_ref) != length(seq) for seq in aligned_seqs
@@ -250,7 +251,10 @@ function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seqs::Vector{LongDNA
         # project msa to valid pairwise alignment by removing redundant gaps - i.e. gaps matched to gaps
         stripped_aligned_ref, stripped_aligned_seq = strip_gap_only_cols(aligned_ref, aligned_seqs[i])
         # then clean the new pairwise alignment
-        cleaned_ref, cleaned_seq = clean_frameshifts(stripped_aligned_ref, stripped_aligned_seq)
+        if verbose
+            println("\naligned_seq index: ", i)
+        end
+        cleaned_ref, cleaned_seq = clean_frameshifts(stripped_aligned_ref, stripped_aligned_seq, verbose=verbose)
         # save result
         cleaned_refs[i] = cleaned_ref
         cleaned_seqs[i] = cleaned_seq
