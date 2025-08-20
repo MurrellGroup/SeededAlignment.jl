@@ -80,7 +80,7 @@ for i in 1:num_seqs
     cur_ref = AA_seqs[i]
     @assert length(cur_denoised) == length(cur_ref)
     for j in 1:length(cur_ref)
-        if cur_ref[j] != cur_denoised[j] #&& (cur_denoised[j] != AminoAcid('X')) for investigating...
+        if cur_ref[j] != cur_denoised[j] #&& (cur_denoised[j] != AminoAcid('X')) for investigating only unexpected errors
             println("seqId: ",i)
             println("codon_index: ", j)
             if j-5 > 0 && length(AA_seqs[i]) > j+5

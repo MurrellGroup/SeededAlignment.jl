@@ -5,11 +5,13 @@ using SeededAlignment
 using BioSequences
 using Random
 
+include("../benchmark/noising.jl")
+
 @testset "SeededAlignment.jl" begin
     @testset "1. noisy alignment nw_affine" begin
         Random.seed!(42)
         A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1001)
-        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 980)
+        B = mutateSequence(A, verbose=false)
         aligned_A, aligned_B = nw_align(A, B)
         # 1.1 alignment doesn't alter the underlying sequences
         @testset "1.1 alignment doesn't alter the underlying sequences" begin
@@ -52,8 +54,8 @@ using Random
                 ref_deletions =  (Move(ref=true, step_length=3, score=-10.0, extendable=true),)
             )
         Random.seed!(42)
-        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 33)
-        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 42)
+        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 330)
+        B = mutateSequence(A, codon_indel_avg = 2.0, frameshift_indel_avg = 0.0, sub_mutation_avg = 0.0, verbose=false)
         # reference informed alignment
         aligned_A, aligned_B = nw_align(ref = A, query = B, moveset=move_set)
         # 2.1 alignment doesn't alter the underlying sequences
@@ -79,7 +81,7 @@ using Random
         # TODO better to use more similar sequences so it finds more kmers
         Random.seed!(42)
         A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1001)
-        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 980)
+        B = mutateSequence(A, verbose=false)
         aligned_A, aligned_B = seed_chain_align(A, B)
         # 3.1 alignment doesn't alter the underlying sequences
         @testset "3.1 alignment doesn't alter the underlying sequences" begin
@@ -102,8 +104,8 @@ using Random
                 ref_deletions =  (Move(ref=true, step_length=3, score=-10.0, extendable=true),)
             )
         Random.seed!(42) # TODO better to use more similar sequences so it finds more kmers
-        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 33)
-        B = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 42)
+        A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 330)
+        B = mutateSequence(A, codon_indel_avg = 2.0, frameshift_indel_avg = 0.0, sub_mutation_avg = 0.0, verbose=false)
         # reference informed alignment
         aligned_A, aligned_B = seed_chain_align(ref = A, query = B, moveset=move_set)
         # 4.1 alignment doesn't alter the underlying sequences
@@ -126,17 +128,19 @@ using Random
     end
 
     @testset "5. msa_codon_align" begin
+        println("msa moment")
         Random.seed!(42)
+        m = 10
         ref = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 51)
-        seqs = Vector{LongDNA{4}}(undef, 10)
-        for i in 1:10
-            seqs[i] = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 33+i)
+        seqs = Vector{LongDNA{4}}(undef, m)
+        for i in 1:m
+            seqs[i] = mutateSequence(ref, codon_indel_avg = 1.0, frameshift_indel_avg = 1.0, sub_mutation_avg = 1.0, verbose=false)
         end
 	    # 5.1 aligned_sequences have the same length
         @testset "5.1 aligned_sequences have the same length" begin
             msa = msa_codon_align(ref, seqs)
             n = length(msa[1])
-            for i in 1:10
+            for i in 1:m
                 @test n == length(msa[i+1])
             end
         end

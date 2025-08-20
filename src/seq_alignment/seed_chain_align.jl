@@ -55,7 +55,7 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset = STD_N
     codon_scoring_on=false
     # unpack arguments and call the internal alignment function
     _seed_chain_align(
-        A, B, moveset, scoring, codon_scoring_on, do_clean_frameshifts, verbose
+        A, B, moveset, scoring, codon_scoring_on, do_clean_frameshifts, verbose, false
     )
 
 end
@@ -132,12 +132,12 @@ function seed_chain_align(;
                                          - in other words codon insertions or deletions must be allowed."))
     # unpack arguments and call the internal alignment function
     _seed_chain_align(
-        ref, query, moveset, scoring, codon_scoring_on, do_clean_frameshifts, verbose
+        ref, query, moveset, scoring, codon_scoring_on, do_clean_frameshifts, verbose, true
     )
 end
 
 @inbounds function _seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
-    codon_scoring_on=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) #; seed_debug_mode=true)
+    codon_scoring_on=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool, A_is_ref::Bool=false) #; seed_debug_mode=true)
 
     # unpack parameters
     k = scoring.kmer_length
@@ -151,7 +151,7 @@ end
     edge_ext_begin = scoring.edge_ext_begin
     edge_ext_end = scoring.edge_ext_end
     # seeding heuristic
-    kmerMatches = find_kmer_matches(A, B, k)
+    kmerMatches = find_kmer_matches(A, B, k, A_is_ref=A_is_ref)
     # two possible seeding heuristics
     kmerPath = select_kmer_path(kmerMatches, length(A), length(B), nucleotide_score_matrix, match_score, mismatch_score, 
         vgap_moves, hgap_moves, extension_score, k)
@@ -164,16 +164,11 @@ end
     prevB = -k+1
     result = [LongDNA{4}(""), LongDNA{4}("")]
     @views for kmer in kmerPath
-        # TODO make so seeding considers codons for better performance, especially then we can combine kmers better
         # TODO we want to do "result .*=" all in one step preferably
-        # shift start of kmer to start of next codon
-        offset_from_codon_boundary = ((kmer.posA) % 3)
-        new_posA = (3-offset_from_codon_boundary)+4 + kmer.posA
-        new_posB = (3-offset_from_codon_boundary)+4 + kmer.posB
-        if !(new_posA == prevA + k && new_posB == prevB + k)
+        if !(kmer.posA == prevA + k && kmer.posB == prevB + k)
             if prevA == -k+1 && prevB == -k+1
                 # align without cleaning frameshifts
-                alignment = _nw_align(A[prevA + k : new_posA - 1], B[prevB + k : new_posB - 1], vgap_moves, hgap_moves, extension_score, 
+                alignment = _nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, extension_score, 
                     edge_ext_begin, false, match_score, mismatch_score, nucleotide_score_matrix, codon_match_bonus_score, codon_scoring_on)
                 # add alignment unless seed_debug_mode
                 #= (only for internal debug)
@@ -184,7 +179,7 @@ end
                 result .*= alignment
             else
                 # align without cleaning frameshifts
-                alignment = _nw_align(A[prevA + k : new_posA - 1], B[prevB + k : new_posB - 1], vgap_moves, hgap_moves, extension_score, 
+                alignment = _nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, extension_score, 
                     false, false, match_score, mismatch_score, nucleotide_score_matrix, codon_match_bonus_score, codon_scoring_on)
                 # add alignment unless seed_debug_mode
                 #= (only for internal debug) 
@@ -195,9 +190,9 @@ end
                 result .*= alignment 
             end
         end
-        result .*= [A[new_posA : new_posA + k - 1], B[new_posB : new_posB + k - 1]]
-        prevA = new_posA
-        prevB = new_posB
+        result .*= [A[kmer.posA : kmer.posA + k - 1], B[kmer.posB : kmer.posB + k - 1]]
+        prevA = kmer.posA
+        prevB = kmer.posB
     end
     # align the remaining parts of the sequences - without cleaning frameshifts
     alignment = _nw_align(A[prevA + k : end], B[prevB + k : end], vgap_moves, hgap_moves, extension_score, 
@@ -216,6 +211,7 @@ end
     # return result as Tuple
     return result[1], result[2]
 end
+
 #= (only for internal debug)
 function obfuscate_nucleotides!(seq::LongDNA{4})
     for i in eachindex(seq)

@@ -8,7 +8,7 @@ end
 
 # TODO look for improvements here
 # TODO use views and convert kmer to hash_key, then use the hash_key as the key for the dict. 
-@views function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmer_length::Int64; repetition_threshold::Int64 = 5) 
+@views function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmer_length::Int64; repetition_threshold::Int64 = 5, A_is_ref::Bool=false) 
 
     # Abbreviations
     k = kmer_length
@@ -20,12 +20,24 @@ end
     # Produce dictionary of all kmers in A
     # TODO consider replacing keys to Int64
     kmerDict = Dict{LongDNA{4}, Vector{Int64}}()
-    for i in 1:m-k+1
-        @views kmer = A[i:i+k-1]
-        if haskey(kmerDict, kmer)
-            push!(kmerDict[kmer], i)
-        else
-            kmerDict[kmer] = [i]
+    if !A_is_ref
+        for i in 1:m-k+1
+            @views kmer = A[i:i+k-1]
+            if haskey(kmerDict, kmer)
+                push!(kmerDict[kmer], i)
+            else
+                kmerDict[kmer] = [i]
+            end
+        end
+    else
+        # seeds in A must obide by reading frame
+        for i in 1:(m-k+1)÷3
+            @views kmer = A[3*(i-1)+1:(3*(i-1)+1)+k-1]
+            if haskey(kmerDict, kmer)
+                push!(kmerDict[kmer], 3*(i-1)+1)
+            else
+                kmerDict[kmer] = [3*(i-1)+1]
+            end
         end
     end
 

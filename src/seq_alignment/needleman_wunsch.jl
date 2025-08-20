@@ -332,6 +332,8 @@ function backtrack_dp_matrix(dp_matrix::Matrix{Float64}, haffine_matrix::Matrix{
         end
     end
     # loop rest of backtrack
+    px = x
+    py = y
     while x > column_offset || y > row_offset
         top_sequence_pos = x-column_offset
         left_sequence_pos = y-row_offset
@@ -344,6 +346,9 @@ function backtrack_dp_matrix(dp_matrix::Matrix{Float64}, haffine_matrix::Matrix{
             push!(res_B, DNA_Gap)
             x -= 1
         else
+            #if px == x && py == y && x != column_offset && y != row_offset
+            #    error("backtracking failed")
+            #end
             # record previous position
             px = x
             py = y

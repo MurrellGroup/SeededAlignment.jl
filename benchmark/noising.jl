@@ -2,11 +2,11 @@ using BioSequences
 using Distributions
 using Random
 
-# TODO add an improved mutateSequence function using better noise
 function mutateSequence(org_seq::LongDNA{4}; 
     codon_indel_avg::Float64 = 5.0, 
     frameshift_indel_avg::Float64 = 3.0,
-    sub_mutation_avg::Float64 = 5.0    
+    sub_mutation_avg::Float64 = 5.0,
+    verbose=true
 )
     # initialize mutations
     seq = copy(org_seq)
@@ -22,12 +22,15 @@ function mutateSequence(org_seq::LongDNA{4};
     cnt_frm_ins = 0
     # codon indel mutations
     for i in 1:num_codon_indels
-        println(length(seq))
         indel_pos = rand(1:(n-4)÷3)
-        println("indel_pos: ", 3*indel_pos)
+        if verbose
+            println("indel_pos: ", 3*indel_pos)
+        end
         a = rand(Bool)
-        if a 
-            println("insert")
+        if a
+            if verbose
+                println("insert")
+            end
             # insertion
             # length = rand(1:4)
             len = 1
@@ -36,41 +39,50 @@ function mutateSequence(org_seq::LongDNA{4};
             n += 3*len
             cnt_codon_ins += len
         else
-            println("deletion")
+            if verbose
+                println("deletion")
+            end
             cnt_codon_del += 1
             seq = seq[1:3*indel_pos] * seq[3*indel_pos + 4 : end]
             n -= 3
         end
-        println(length(seq))
     end
     # frameshift mutations
     for i in 1:num_frameshifts
         indel_pos = rand(2:n-1)
         a = rand(Bool)
         if a
-            println("frameshift insert")
+            if verbose
+                println("frameshift insert")
+            end
             cnt_frm_ins += 1
             seq = seq[1:indel_pos] * randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1) * seq[indel_pos + 1 : end]
             n += 1
         else
             # deletion
             cnt_frm_del += 1
-            println("frameshift deletion")
+            if verbose
+                println("frameshift deletion")
+            end
             deleteat!(seq, indel_pos+1)
             n -= 1
         end
     end
     # substritution mutations
     for i in 1:num_sub_mutations
-        println("mutation")
+        if verbose
+            println("mutation")
+        end
         mutation_pos = rand(2:n-1)
         seq = seq[1:mutation_pos-1] * randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1) * seq[mutation_pos+1:end]
     end
-    println("num codon deletions: ", cnt_codon_del)
-    println("num codon insertions: ", cnt_codon_ins)
-    println("num substitution mutations: ", num_sub_mutations)
-    println("num frameshift deletions: ", cnt_frm_del)
-    println("num frameshift insertions: ", cnt_frm_ins)
+    if verbose
+        println("num codon deletions: ", cnt_codon_del)
+        println("num codon insertions: ", cnt_codon_ins)
+        println("num substitution mutations: ", num_sub_mutations)
+        println("num frameshift deletions: ", cnt_frm_del)
+        println("num frameshift insertions: ", cnt_frm_ins)
+    end
     return seq
 end
 
