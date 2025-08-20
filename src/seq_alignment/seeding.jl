@@ -6,9 +6,9 @@ end
 
 # seeding functions
 
-# TODO look for improvements here
+# TODO look for improvements here main bottleneck
 # TODO use views and convert kmer to hash_key, then use the hash_key as the key for the dict. 
-@views function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmer_length::Int64; repetition_threshold::Int64 = 5, A_is_ref::Bool=false) 
+@views @inbounds function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmer_length::Int64; repetition_threshold::Int64 = 5, A_is_ref::Bool=false) 
 
     # Abbreviations
     k = kmer_length
@@ -18,25 +18,26 @@ end
     # List of all kmer matches between A and B
     kmer_matches = KmerMatch[]
     # Produce dictionary of all kmers in A
-    # TODO consider replacing keys to Int64
-    kmerDict = Dict{LongDNA{4}, Vector{Int64}}()
+    kmerDict = Dict{UInt64, Vector{Int64}}()
     if !A_is_ref
         for i in 1:m-k+1
-            @views kmer = A[i:i+k-1]
-            if haskey(kmerDict, kmer)
-                push!(kmerDict[kmer], i)
+            kmer = A[i:i+k-1]
+            hash_key = encode_kmer(kmer)
+            if haskey(kmerDict, hash_key)
+                push!(kmerDict[hash_key], i)
             else
-                kmerDict[kmer] = [i]
+                kmerDict[hash_key] = [i]
             end
         end
     else
         # seeds in A must obide by reading frame
         for i in 1:(m-k+1)÷3
-            @views kmer = A[3*(i-1)+1:(3*(i-1)+1)+k-1]
-            if haskey(kmerDict, kmer)
-                push!(kmerDict[kmer], 3*(i-1)+1)
+            kmer = A[3*(i-1)+1:(3*(i-1)+1)+k-1]
+            hash_key = encode_kmer(kmer)
+            if haskey(kmerDict, hash_key)
+                push!(kmerDict[hash_key], 3*(i-1)+1)
             else
-                kmerDict[kmer] = [3*(i-1)+1]
+                kmerDict[hash_key] = [3*(i-1)+1]
             end
         end
     end
@@ -50,10 +51,11 @@ end
     overlaps with previous added KmerMatch. On the other hand this causes more kmerMatches to appear and make the alignment slower overall.=#
     for iB in 1 : n-k+1
         @views kmer = B[iB : iB+k-1]
+        hash_key = encode_kmer(kmer)
         # skips kmers which are too common in sequence A
-        if (haskey(kmerDict, kmer) && length(kmerDict[kmer]) <= repetition_threshold)
+        if (haskey(kmerDict, hash_key) && length(kmerDict[hash_key]) <= repetition_threshold)
             #Add found match(es) to list
-            for iA in kmerDict[kmer]
+            for iA in kmerDict[hash_key]
                 diag_idx = iA - iB + n + 1
                 # sufficent condition for no overlap
                 # TODO could be bad if iA is big early because blocks other matches along that diagonal. Remedy was suggested above.
@@ -75,7 +77,15 @@ struct Endpoint
     id::Int64
     isBeginning::Bool
 end
-
+# bitmask for kmer hashing
+function encode_kmer(kmer::LongDNA{4})
+    code::UInt64 = 0
+    @inbounds @simd for j in 1:length(kmer)
+        code <<= 2
+        code |= trailing_zeros(BioSequences.compatbits(kmer[j]))  # .data is 0,1,2,3 for A,C,G,T
+    end
+    return code
+end
 # Estimate pealty between kmer matches x and y
 @inline function getConnectionScore(x::KmerMatch, y::KmerMatch, k::Int64, gap_score_estimate::Float64, match_score_estimate::Float64)
     m = y.posA - x.posA - k
