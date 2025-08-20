@@ -8,7 +8,7 @@ end
 
 # TODO look for improvements here main bottleneck
 # TODO use views and convert kmer to hash_key, then use the hash_key as the key for the dict. 
-@views @inbounds function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmer_length::Int64; repetition_threshold::Int64 = 5, A_is_ref::Bool=false) 
+@inbounds function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmer_length::Int64; repetition_threshold::Int64 = 5, A_is_ref::Bool=false) 
 
     # Abbreviations
     k = kmer_length
@@ -21,10 +21,11 @@ end
     kmerDict = Dict{UInt64, Vector{Int64}}()
     if !A_is_ref
         for i in 1:m-k+1
-            kmer = A[i:i+k-1]
-            hash_key = encode_kmer(kmer)
+            hash_key = encode_kmer(A, i, k)
             if haskey(kmerDict, hash_key)
-                push!(kmerDict[hash_key], i)
+                if length(kmerDict[hash_key]) <= repetition_threshold
+                    push!(kmerDict[hash_key], i)
+                end
             else
                 kmerDict[hash_key] = [i]
             end
@@ -32,10 +33,12 @@ end
     else
         # seeds in A must obide by reading frame
         for i in 1:(m-k+1)÷3
-            kmer = A[3*(i-1)+1:(3*(i-1)+1)+k-1]
-            hash_key = encode_kmer(kmer)
+            hash_key = encode_kmer(A, 3*(i-1)+1, k)
             if haskey(kmerDict, hash_key)
-                push!(kmerDict[hash_key], 3*(i-1)+1)
+                vec = kmerDict[hash_key]
+                if length(vec) <= repetition_threshold
+                    push!(vec, 3*(i-1)+1)
+                end
             else
                 kmerDict[hash_key] = [3*(i-1)+1]
             end
@@ -50,8 +53,7 @@ end
     #= TODO improvement idea - find all kmerMatches on diagional i. Sort them, itterate, check if current KmerMatch 
     overlaps with previous added KmerMatch. On the other hand this causes more kmerMatches to appear and make the alignment slower overall.=#
     for iB in 1 : n-k+1
-        @views kmer = B[iB : iB+k-1]
-        hash_key = encode_kmer(kmer)
+        hash_key = encode_kmer(B, iB, k)
         # skips kmers which are too common in sequence A
         if (haskey(kmerDict, hash_key) && length(kmerDict[hash_key]) <= repetition_threshold)
             #Add found match(es) to list
@@ -78,11 +80,11 @@ struct Endpoint
     isBeginning::Bool
 end
 # bitmask for kmer hashing
-function encode_kmer(kmer::LongDNA{4})
+function encode_kmer(A::LongDNA{4}, start::Int64, k::Int64)
     code::UInt64 = 0
-    @inbounds @simd for j in 1:length(kmer)
+    @inbounds @simd for j in 0:k-1
         code <<= 2
-        code |= trailing_zeros(BioSequences.compatbits(kmer[j]))  # .data is 0,1,2,3 for A,C,G,T
+        code |= trailing_zeros(BioSequences.compatbits(A[start+j]))  # .data is 0,1,2,3 for A,C,G,T
     end
     return code
 end
