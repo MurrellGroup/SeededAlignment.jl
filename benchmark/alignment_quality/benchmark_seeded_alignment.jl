@@ -43,13 +43,16 @@ function translate_aligned_nuc_seq(nuc_seq::LongDNA{4})
     # assumes frameshift-free
     codon_len = length(nuc_seq) ÷ 3
     aa_seq = LongAA("")
+    aa_ambigious = AminoAcid('X')
     isCodonGap = x -> !any([y != DNA_Gap for y in x])
     for i in 1:codon_len
         cur_codon = nuc_seq[3*(i-1)+1:3*i]
-        if isCodonGap(cur_codon)
+        if DNA_N in cur_codon
+            push!(aa_seq, aa_ambigious)
+        elseif isCodonGap(cur_codon)
             push!(aa_seq, AA_Gap)
         else
-            push!(aa_seq, SeededAlignment.fast_translate((cur_codon[1],cur_codon[2],cur_codon[3])))
+            push!(aa_seq, SeededAlignment.fast_translate(cur_codon[1],cur_codon[2],cur_codon[3]))
         end
     end
     return aa_seq
@@ -84,14 +87,20 @@ for i in 1:num_seqs
             println("seqId: ",i)
             println("codon_index: ", j)
             if j-5 > 0 && length(AA_seqs[i]) > j+5
-                println("noise_corrected: ",cur_denoised[j-5:j+5])
-                println("no noise:        ", cur_ref[j-5:j+5])
+                print("noise_corrected: ")
+                color_diff(cur_denoised[j-5:j+5], cur_ref[j-5:j+5], second=false)
+                print("no noise:        ") 
+                color_diff(cur_denoised[j-5:j+5], cur_ref[j-5:j+5], first=false)
             elseif length(AA_seqs[i]) < j+5
-                println("noise_corrected: ",cur_denoised[j-5:end])
-                println("no noise: ",cur_ref[j-5:end])
+                print("noise_corrected: ")
+                color_diff(cur_denoised[j-5:end], cur_ref[j-5:end], second=false)
+                print("no noise:        ") 
+                color_diff(cur_denoised[j-5:end], cur_ref[j-5:end], first=false)
             else
-                println("noise_corrected: ",cur_denoised[1:j+5])
-                println("no noise: ",cur_ref[1:j+5])
+                print("noise_corrected: ")
+                color_diff(cur_denoised[1:j+5], cur_ref[1:j+5], second=false)
+                print("no noise:        ") 
+                color_diff(cur_denoised[1:j+5], cur_ref[1:j+5], first=false)
             end
         end
     end 
@@ -123,9 +132,9 @@ for idx in 1:num_seqs
         prot_src_alignment = translate_aligned_nuc_seq.(src_alignment)
         # get nucleotide and protein SP_score
         nuc_matched_percentage = SP_score(target_alignment, src_alignment)
+        println("(nucleotide-level) alignment column match %: ", 100*nuc_matched_percentage, "\n")
         prot_matched_percentage = SP_score(prot_target_alignment, prot_src_alignment)
-        println("(nucleotide-level) alignment column match %: ", 100*nuc_matched_percentage)
-        println("(protein-level) alignment column match %: ", 100*prot_matched_percentage)
+        println("(protein-level) alignment column match %: ", 100*prot_matched_percentage, "\n")
         list_of_similarity_scores_nuc[idx] = nuc_matched_percentage
         list_of_similarity_scores_prot[idx] = prot_matched_percentage
     else

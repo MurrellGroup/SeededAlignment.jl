@@ -43,10 +43,10 @@ const CODON_TABLE::Vector{AminoAcid} = AminoAcid[
 @inline toInt(x::NucleicAcid) = Int(trailing_zeros(BioSequences.compatbits(x)))+1 # decodes ambigious nucleotides badly
 @inline toInt(aa::AminoAcid)::Int = Int(trailing_zeros(BioSequences.compatbits(aa)))+1
 # translation function
-@inline function fast_translate(dna_seq::NTuple{3, DNA})
-    i1 = toInt(dna_seq[1])
-    i2 = toInt(dna_seq[2])
-    i3 = toInt(dna_seq[3])
+@inline function fast_translate(dna_seq1::DNA,dna_seq2::DNA,dna_seq3::DNA)
+    i1 = toInt(dna_seq1)
+    i2 = toInt(dna_seq2)
+    i3 = toInt(dna_seq3)
     hash_index = (i1 - 1)*16 + (i2 - 1)*4 + i3
     return SeededAlignment.CODON_TABLE[hash_index]
 end

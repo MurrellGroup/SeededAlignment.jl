@@ -74,7 +74,7 @@ end
 """
 	ScoringScheme(;
 		extension_score::Float64=-0.3,
-		kmer_length::Int64=18,
+		kmer_length::Int64=12,
 		edge_ext_begin::Bool=true,
 		edge_ext_end::Bool=true,
 		nucleotide_match_score::Float64 = 0.0,
@@ -114,7 +114,7 @@ seed_chain_align(A,B scoring=score_params)
 """
 function ScoringScheme(; 
 	extension_score::Float64=-0.3, 
-	kmer_length::Int64=18, 
+	kmer_length::Int64=12, 
 	edge_ext_begin=true::Bool, 
 	edge_ext_end=true::Bool,
 	nucleotide_match_score::Float64 = 0.0,
@@ -151,7 +151,7 @@ constant `ScoreScheme` that stores the default scoring parameters used in alignm
 ```julia
 const STD_SCORING = ScoringScheme(
 	extension_score=-0.3,
-	kmer_length=15,
+	kmer_length=12,
 	edge_ext_begin=true,
 	edge_ext_end=true,
 	nucleotide_mismatch_score = -0.8,
@@ -163,7 +163,7 @@ const STD_SCORING = ScoringScheme(
 """
 const STD_SCORING = ScoringScheme(
 	extension_score=-0.3,
-	kmer_length=15,
+	kmer_length=12,
 	edge_ext_begin=true,
 	edge_ext_end=true,
 	nucleotide_mismatch_score = -0.8,

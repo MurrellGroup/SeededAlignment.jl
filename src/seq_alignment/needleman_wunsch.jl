@@ -174,12 +174,11 @@ end
     for row_index ∈ row_offset : row_boundary
         for column_index ∈ column_offset : column_boundary
             top_sequence_pos = (column_index-column_offset)
-            left_sequence_pos = (row_index-row_offset)
             # reward for matching codons if enabled
             if codon_scoring_on && (top_sequence_pos) % 3 == 0
                 # performance optimized translation
-                ref_AA = fast_translate((A2[column_index-3],A2[column_index-2],A2[column_index-1]))
-                seq_AA = fast_translate((B2[row_index-3],B2[row_index-2],B2[row_index-1]))
+                ref_AA = fast_translate(A2[column_index-3],A2[column_index-2],A2[column_index-1])
+                seq_AA = fast_translate(B2[row_index-3],B2[row_index-2],B2[row_index-1])
                 # check if AminoAcids match and handle stop_codons
                 if ref_AA == seq_AA && ref_AA != stop_aa
                     # get nucleotide mismatch_score
@@ -308,7 +307,6 @@ end
     # loop rest of backtrack
     while x > column_offset || y > row_offset
         top_sequence_pos = x-column_offset
-        left_sequence_pos = y-row_offset
         if x == column_offset # first column
             push!(res_A, DNA_Gap)
             push!(res_B, B2[y - 1])
@@ -325,8 +323,8 @@ end
             if !must_move_hor && !must_move_ver 
                 # reward for matching codons if enabled
                 if codon_scoring_on && (top_sequence_pos) % 3 == 0
-                    ref_AA = fast_translate((A2[x-3],A2[x-2],A2[x-1]))
-                    seq_AA = fast_translate((B2[y-3],B2[y-2],B2[y-1]))
+                    ref_AA = fast_translate(A2[x-3],A2[x-2],A2[x-1])
+                    seq_AA = fast_translate(B2[y-3],B2[y-2],B2[y-1])
                     if ref_AA == seq_AA && ref_AA != stop_aa
                         # get nucleotide mismatch_score
                         match_score = sum(t -> score_match(A2[x - t], B2[y - t], nuc_score_matrix, nuc_match_score, nuc_mismatch_score),1:3)
@@ -424,7 +422,7 @@ end
             end
 
             # if no move was found
-            if verbose && (px == x && py == y)
+            if (px == x && py == y)
                 error("Backtracking failed")
             end
         end

@@ -136,9 +136,10 @@ function seed_chain_align(;
     )
 end
 
-@inbounds function _seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
-    codon_scoring_on=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool, A_is_ref::Bool=false) #; seed_debug_mode=true)
+@inbounds @fastmath function _seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
+    codon_scoring_on=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool, A_is_ref::Bool=false)
 
+    n, m = length(A), length(B)
     # unpack parameters
     k = scoring.kmer_length
     vgap_moves = moveset.vert_moves
@@ -152,72 +153,59 @@ end
     edge_ext_end = scoring.edge_ext_end
     # seeding heuristic
     kmerMatches = find_kmer_matches(A, B, k, A_is_ref=A_is_ref)
+    # revert to nw_align if sequences are too disimiliar
+    if length(kmerMatches) == 0
+        return _nw_align(A[1 : end], B[1 : end], vgap_moves, hgap_moves, extension_score, 
+        edge_ext_begin, edge_ext_end, match_score, mismatch_score, nucleotide_score_matrix, codon_match_bonus_score, 
+        codon_scoring_on, do_clean_frameshifts, verbose)
+    end
+
     # two possible seeding heuristics
-    kmerPath = select_kmer_path(kmerMatches, length(A), length(B), nucleotide_score_matrix, match_score, mismatch_score, 
+    kmerPath = select_kmer_path(kmerMatches, n, m, nucleotide_score_matrix, match_score, mismatch_score, 
         vgap_moves, hgap_moves, extension_score, k)
     #kmerPath = select_max_correlation_kmer_path(kmerMatches, k)
-    # parameters for joining kmers/seeds
-    extra_kmer_margin = 6
+
     # Join kmers using needleman-wunsch
-    k = k-extra_kmer_margin
     prevA = -k+1
     prevB = -k+1
-    result = [LongDNA{4}(""), LongDNA{4}("")]
-    @views for kmer in kmerPath
-        # TODO we want to do "result .*=" all in one step preferably
+    resultA = LongDNA{4}("") 
+    resultB = LongDNA{4}("")
+    # handle first kmer as special case outside loop
+    kmer = kmerPath[1]
+    if !(kmer.posA == 1 && kmer.posB == 1)
+        # align without cleaning frameshifts
+        alignment = _nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, extension_score, 
+            edge_ext_begin, false, match_score, mismatch_score, nucleotide_score_matrix, codon_match_bonus_score, codon_scoring_on)
+        append!(resultA, alignment[1])
+        append!(resultB, alignment[2])
+    end
+    append!(resultA, A[kmer.posA : kmer.posA + k - 1])
+    append!(resultB, B[kmer.posB : kmer.posB + k - 1])
+    prevA = kmer.posA
+    prevB = kmer.posB
+    # loop thorugh rest of kmers
+    for kmer in kmerPath[2:end]
         if !(kmer.posA == prevA + k && kmer.posB == prevB + k)
-            if prevA == -k+1 && prevB == -k+1
-                # align without cleaning frameshifts
-                alignment = _nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, extension_score, 
-                    edge_ext_begin, false, match_score, mismatch_score, nucleotide_score_matrix, codon_match_bonus_score, codon_scoring_on)
-                # add alignment unless seed_debug_mode
-                #= (only for internal debug)
-                if seed_debug_mode
-                    obfuscate_nucleotides!.(alignment)
-                end
-                =#
-                result .*= alignment
-            else
-                # align without cleaning frameshifts
-                alignment = _nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, extension_score, 
-                    false, false, match_score, mismatch_score, nucleotide_score_matrix, codon_match_bonus_score, codon_scoring_on)
-                # add alignment unless seed_debug_mode
-                #= (only for internal debug) 
-                if seed_debug_mode
-                    obfuscate_nucleotides!.(alignment)
-                end
-                =#
-                result .*= alignment 
-            end
+            # align without cleaning frameshifts
+            alignment = _nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, extension_score, 
+                false, false, match_score, mismatch_score, nucleotide_score_matrix, codon_match_bonus_score, codon_scoring_on)
+            append!(resultA, alignment[1])
+            append!(resultB, alignment[2])
         end
-        result .*= [A[kmer.posA : kmer.posA + k - 1], B[kmer.posB : kmer.posB + k - 1]]
+        append!(resultA, A[kmer.posA : kmer.posA + k - 1])
+        append!(resultB, B[kmer.posB : kmer.posB + k - 1])
         prevA = kmer.posA
         prevB = kmer.posB
     end
-    # align the remaining parts of the sequences - without cleaning frameshifts
+    # align the  last part of the sequences - without cleaning frameshifts
     alignment = _nw_align(A[prevA + k : end], B[prevB + k : end], vgap_moves, hgap_moves, extension_score, 
         false, edge_ext_end, match_score, mismatch_score, nucleotide_score_matrix, codon_match_bonus_score, codon_scoring_on)
-    # add alignment unless seed_debug_mode
-    #= (only for internal debug) 
-    if seed_debug_mode
-        obfuscate_nucleotides!.(alignment)
-    end
-    =#
-    result .*= alignment 
+    append!(resultA, alignment[1])
+    append!(resultB, alignment[2])
     # clean_frameshifts 
-    if do_clean_frameshifts # && !seed_debug_mode (only for internal debug)
-        result[1], result[2] = clean_frameshifts(result[1], result[2], verbose = verbose)
+    if do_clean_frameshifts
+        resultA, resultB = clean_frameshifts(resultA, resultB, verbose = verbose)
     end
-    # return result as Tuple
-    return result[1], result[2]
+    # return alignment as Tuple
+    return resultA, resultB
 end
-
-#= (only for internal debug)
-function obfuscate_nucleotides!(seq::LongDNA{4})
-    for i in eachindex(seq)
-        if seq[i] != DNA_Gap && seq[i] != LongDNA{4}("N")
-            seq[i] = DNA_R        
-        end
-    end
-end
-=#

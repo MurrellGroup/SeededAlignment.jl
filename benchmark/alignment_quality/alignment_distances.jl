@@ -27,9 +27,9 @@ function levenshtein(seq1::BioSequence{T}, seq2::BioSequence{T}) where T<:Alphab
 end
 
 function SP_score(target_alignment::Tuple{BioSequence{T},BioSequence{T}}, src_alignment::Tuple{BioSequence{T},BioSequence{T}}) where T<:Alphabet
-    @assert length(target_alignment[1]) == length(src_alignment[1]) # FIXME handle case where different lengths if it arises enough
+    @assert length(target_alignment[1]) == length(src_alignment[1])
     seqlen = length(target_alignment[1])
-    display_offset = 40
+    display_offset = 20
     matches = 0
     last_err_index = -display_offset
     for j in 1:seqlen
@@ -37,18 +37,86 @@ function SP_score(target_alignment::Tuple{BioSequence{T},BioSequence{T}}, src_al
             matches += 1
         elseif j-last_err_index > display_offset
             last_err_index = j
-            println("alignment_index: ", j)
+            println("comparision of source and target alignment - alignment_index: ", j)
             if j-display_offset > 0 && seqlen > j+display_offset
-                println("target alignment:\n",target_alignment[1][j-display_offset:j+display_offset],"\n",target_alignment[2][j-display_offset:j+display_offset])
-                println("src alignment:\n", src_alignment[1][j-display_offset:j+display_offset],"\n",src_alignment[2][j-display_offset:j+display_offset])
+                println("target alignment:")
+                color_diff(target_alignment[1][j-display_offset:j+display_offset],target_alignment[2][j-display_offset:j+display_offset])
+                println("src alignment:") 
+                color_diff(src_alignment[1][j-display_offset:j+display_offset],src_alignment[2][j-display_offset:j+display_offset])
+                println("\nDifference between first sequence")
+                print("target alignment[1]: ")
+                color_diff(target_alignment[1][j-display_offset:j+display_offset], src_alignment[1][j-display_offset:j+display_offset], second=false)
+                print("src alignment[1]:    ") 
+                color_diff(target_alignment[1][j-display_offset:j+display_offset], src_alignment[1][j-display_offset:j+display_offset], first=false)
+                println("\nDifference between second sequence")
+                print("target alignment[2]: ")
+                color_diff(target_alignment[2][j-display_offset:j+display_offset], src_alignment[2][j-display_offset:j+display_offset], second=false)
+                print("src alignment[2]:    ") 
+                color_diff(target_alignment[2][j-display_offset:j+display_offset], src_alignment[2][j-display_offset:j+display_offset], first=false)
             elseif seqlen < j+display_offset
-                println("target alignment:\n",target_alignment[1][j-display_offset:end],"\n",target_alignment[2][j-display_offset:end])
-                println("src alignment:\n", src_alignment[1][j-display_offset:end],"\n",src_alignment[2][j-display_offset:end])
+                println("target alignment:"),
+                color_diff(target_alignment[1][j-display_offset:end],target_alignment[2][j-display_offset:end])
+                println("src alignment:") 
+                color_diff(src_alignment[1][j-display_offset:end],src_alignment[2][j-display_offset:end])
+                println("\nDifference between first sequence")
+                print("target alignment[1]: ")
+                color_diff(target_alignment[1][j-display_offset:end], src_alignment[1][j-display_offset:end], second=false)
+                print("src alignment[1]:    ") 
+                color_diff(target_alignment[1][j-display_offset:end], src_alignment[1][j-display_offset:end], first=false)
+                println("\nDifference between second sequence")
+                print("target alignment[2]: ")
+                color_diff(target_alignment[2][j-display_offset:end], src_alignment[2][j-display_offset:end], second=false)
+                print("src alignment[2]:    ") 
+                color_diff(target_alignment[2][j-display_offset:end], src_alignment[2][j-display_offset:end], first=false)
             else
-                println("target alignment:\n",target_alignment[1][1:j+display_offset],"\n",target_alignment[2][1:j+display_offset])
-                println("src alignment:\n", src_alignment[1][1:j+display_offset],"\n",src_alignment[2][1:j+display_offset])
+                println("target alignment:")
+                color_diff(target_alignment[1][1:j+display_offset],target_alignment[2][1:j+display_offset])
+                println("src alignment:") 
+                color_diff(src_alignment[1][1:j+display_offset],src_alignment[2][1:j+display_offset])
+                println("\nDifference between first sequence")
+                print("target alignment[1]: ")
+                color_diff(target_alignment[1][1:j+display_offset], src_alignment[1][1:j+display_offset], second=false)
+                print("src alignment[1]:    ") 
+                color_diff(target_alignment[1][1:j+display_offset], src_alignment[1][1:j+display_offset], first=false)
+                println("\nDifference between second sequence")
+                print("target alignment[2]: ")
+                color_diff(target_alignment[2][1:j+display_offset], src_alignment[2][1:j+display_offset], second=false)
+                print("src alignment[2]:    ") 
+                color_diff(target_alignment[2][1:j+display_offset], src_alignment[2][1:j+display_offset], first=false)
             end
         end
     end
     return (matches/seqlen)
+end
+
+function color_diff(s1::BioSequence{T}, s2::BioSequence{T}; first=true, second=true) where T<:Alphabet
+    red   = "\033[31m"
+    reset = "\033[0m"
+
+    n = max(length(s1), length(s2))
+    s1 = lpad(s1, n)
+    s2 = lpad(s2, n)
+    if first
+        # First string
+        for i in 1:n
+            if s1[i] == s2[i]
+                print(s1[i])               # normal
+            else
+                print(red, s1[i], reset)   # colored
+            end
+        end
+        println()
+    end
+
+    if second
+        # Second string
+        for i in 1:n
+            if s1[i] == s2[i]
+                print(s2[i])               # normal
+            else
+                print(red, s2[i], reset)   # colored
+            end
+        end
+        println()
+    end
 end

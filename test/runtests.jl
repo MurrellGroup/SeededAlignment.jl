@@ -128,7 +128,6 @@ include("../benchmark/noising.jl")
     end
 
     @testset "5. msa_codon_align" begin
-        println("msa moment")
         Random.seed!(42)
         m = 10
         ref = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 51)
