@@ -139,44 +139,37 @@ end
     extension_score::Float64=-0.3, edge_extension_begin=false::Bool, edge_extension_end=false::Bool, nuc_match_score::Float64=0.0,
     nuc_mismatch_score::Float64=-0.8, nuc_score_matrix::S=nothing, codon_match_bonus_score::Float64=6.0, codon_scoring_on=false::Bool, 
     do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y, S<:Union{Nothing, Matrix{Float64}}}
-    # fill up all dp_matricies
-    dp_matrix, haffine_matrix, vaffine_matrix = fill_dp_matricies(A, B, vgap_moves, hgap_moves, extension_score, edge_extension_begin, 
-        edge_extension_end, nuc_match_score, nuc_mismatch_score, nuc_score_matrix, codon_match_bonus_score, codon_scoring_on)
-    # use the dp_matricies to backtrack and return a global optimum
-    aligned_A, aligned_B = backtrack_dp_matrix(dp_matrix, haffine_matrix, vaffine_matrix, A, B, vgap_moves, hgap_moves, extension_score, 
-        edge_extension_begin, edge_extension_end, nuc_match_score, nuc_mismatch_score, nuc_score_matrix, codon_match_bonus_score, 
-        codon_scoring_on, do_clean_frameshifts, verbose)
-    return aligned_A, aligned_B
-end
 
-function fill_dp_matricies(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
-    extension_score::Float64=-0.3, edge_extension_begin=false::Bool, edge_extension_end=false::Bool, nuc_match_score::Float64=0.0,
-    nuc_mismatch_score::Float64=-0.8, nuc_score_matrix::S=nothing, codon_match_bonus_score::Float64=6.0, codon_scoring_on=false::Bool
-    ) where {X, Y, S<:Union{Nothing, Matrix{Float64}}}
-    # get sequence lengths
     n, m = length(A), length(B)
+
     # Offset indicies to avoid bounds-checking
     column_offset = maximum(k -> k.step_length, hgap_moves) + 1
     row_offset =    maximum(k -> k.step_length, vgap_moves) + 1
     column_boundary = n + column_offset
     row_boundary = m + row_offset
+
     # Length of sequences and matrices are increased according to offset
     A2 = LongDNA{4}("A")^(column_offset - 1) * A
     B2 = LongDNA{4}("A")^(row_offset - 1) * B
     # initialize stop_aa
     stop_aa = AminoAcid('*')
+    # Initialize DP matrix
     # The cell at [x + row_offset, y + column_offset] is the score of the best alignment of A[1 : x] with B[1 : y]
     dp_matrix = fill(-Inf64, row_boundary, column_boundary)
+
     # Assign score 0 to the empty alignment
     dp_matrix[row_offset, column_offset] = 0.0
+
     # Affine moves requires two extra DP matrices
     vaffine_matrix = fill(-Inf64, row_boundary, column_boundary)
     haffine_matrix = fill(-Inf64, row_boundary, column_boundary)
+    
     # allow starting in extending
     if edge_extension_begin
         vaffine_matrix[row_offset,column_offset] = 0.0
         haffine_matrix[row_offset,column_offset] = 0.0
     end
+
     # Main DP -step
     for row_index ∈ row_offset : row_boundary
         for column_index ∈ column_offset : column_boundary
@@ -274,27 +267,8 @@ function fill_dp_matricies(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Mo
             vaffine_matrix[row_boundary, column_boundary]
         )
     end
-    return dp_matrix, haffine_matrix, vaffine_matrix
-end
-
-function backtrack_dp_matrix(dp_matrix::Matrix{Float64}, haffine_matrix::Matrix{Float64}, vaffine_matrix::Matrix{Float64},
-    A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, extension_score::Float64=-0.3, 
-    edge_extension_begin=false::Bool, edge_extension_end=false::Bool, nuc_match_score::Float64=0.0, nuc_mismatch_score::Float64=-0.8, 
-    nuc_score_matrix::S=nothing, codon_match_bonus_score::Float64=6.0, codon_scoring_on=false::Bool, do_clean_frameshifts=false::Bool, 
-    verbose=false::Bool) where {X, Y, S<:Union{Nothing, Matrix{Float64}}}
-    # set_up relevant variables
-    n, m = length(A), length(B)
-    # Offset indicies to avoid bounds-checking
-    column_offset = maximum(k -> k.step_length, hgap_moves) + 1
-    row_offset =    maximum(k -> k.step_length, vgap_moves) + 1
-    column_boundary = n + column_offset
-    row_boundary = m + row_offset
-    # Length of sequences and matrices are increased according to offset
-    A2 = LongDNA{4}("A")^(column_offset - 1) * A
-    B2 = LongDNA{4}("A")^(row_offset - 1) * B
-    # initialize stop_aa
-    stop_aa = AminoAcid('*')
-    # Begin Backtracking
+   
+    # Backtracking
     res_A = LongDNA{4}("")
     res_B = LongDNA{4}("")
     # Start at the final cell
@@ -332,8 +306,6 @@ function backtrack_dp_matrix(dp_matrix::Matrix{Float64}, haffine_matrix::Matrix{
         end
     end
     # loop rest of backtrack
-    px = x
-    py = y
     while x > column_offset || y > row_offset
         top_sequence_pos = x-column_offset
         left_sequence_pos = y-row_offset
@@ -346,9 +318,6 @@ function backtrack_dp_matrix(dp_matrix::Matrix{Float64}, haffine_matrix::Matrix{
             push!(res_B, DNA_Gap)
             x -= 1
         else
-            #if px == x && py == y && x != column_offset && y != row_offset
-            #    error("backtracking failed")
-            #end
             # record previous position
             px = x
             py = y
