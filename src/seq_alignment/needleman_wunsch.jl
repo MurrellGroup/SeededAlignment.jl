@@ -322,7 +322,6 @@ end
             px = x
             py = y
             # iterate through digonal match moves
-            match_Found = false
             if !must_move_hor && !must_move_ver 
                 # reward for matching codons if enabled
                 if codon_scoring_on && (top_sequence_pos) % 3 == 0
@@ -342,27 +341,25 @@ end
                             end
                             x -= 3
                             y -= 3
-                            match_Found = true
+                            continue
                         end
                     end
                 end
 
-                if !match_Found
-                    # calculate total (mis-)match score
-                    s = score_match(A2[x-1], B2[y-1], nuc_score_matrix, nuc_match_score, nuc_mismatch_score)
-                    # check if the move leads to the current cell
-                    if fast_simpler_isapprox(dp_matrix[y, x],dp_matrix[y - 1, x - 1] + s)
-                        # record the path
-                        push!(res_A, A2[x - 1])
-                        push!(res_B, B2[y - 1])
-                        x -= 1
-                        y -= 1
-                        match_Found = true
-                    end
+                # calculate total (mis-)match score
+                s = score_match(A2[x-1], B2[y-1], nuc_score_matrix, nuc_match_score, nuc_mismatch_score)
+                # check if the move leads to the current cell
+                if fast_simpler_isapprox(dp_matrix[y, x],dp_matrix[y - 1, x - 1] + s)
+                    # record the path
+                    push!(res_A, A2[x - 1])
+                    push!(res_B, B2[y - 1])
+                    x -= 1
+                    y -= 1
+                    continue
                 end
             end
 
-            if !must_move_hor && !match_Found
+            if !must_move_hor
                 
                 for k ∈ vgap_moves
                     !( !k.ref || (top_sequence_pos) % 3 == 0 ) ? continue : 
@@ -393,7 +390,7 @@ end
                 end
             end
 
-            if !must_move_ver && !match_Found
+            if !must_move_ver
 
                 # iterate through horizontal Move moves
                 for k ∈ hgap_moves

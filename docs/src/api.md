@@ -8,8 +8,8 @@ This section provides detailed documentation for all exported types and function
 
 ## Core Methods
 
-- **`seed_chain_align`** 
-- **`msa_codon_align`** 
+- [`seed_chain_align`](@ref)
+- [`msa_codon_align`](@ref) 
 - [`clean_frameshifts`](@ref)
 - [`nw_align`](@ref)
 
@@ -22,16 +22,16 @@ methods for reading and writing of sequence data in FASTA format.
 
 ## Core Types
 
-- `Move`
-- `Moveset`
-- `ScoringScheme`
-- `LongDNA{4}`
+- [`Move`](@ref)
+- [`Moveset`](@ref)
+- [`ScoringScheme`](@ref)
+- [`LongDNA{4}`] - Array specialized for DNA from BioSequences.jl
 
 ## Standard Parameters
 
-- `std_scoring`
-- `std_codon_moveset`
-- `std_noisy_moveset`
+- [`STD_SCORING`](@ref)
+- [`STD_CODON_MOVESET`](@ref)
+- [`STD_NOISY_MOVESET`](@ref)
 
 ## Index
 
@@ -44,5 +44,5 @@ A complete alphabetical listing of all documented functions.
 
 ```@autodocs
 Modules = [SeededAlignment]
-Order = [:type, :function]
+Order = [:type, :function, :constant]
 ```
