@@ -35,12 +35,7 @@ alignment = (
 =#
 ```
 """
-function nw_align(
-    A::LongDNA{4}, 
-    B::LongDNA{4}; 
-    moveset::Moveset = STD_NOISY_MOVESET, 
-    scoring::ScoringScheme = STD_SCORING
-)   
+function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset = STD_NOISY_MOVESET, scoring::ScoringScheme = STD_SCORING)   
     # throw exception if input sequences contains gaps
     !any(x -> x == DNA_Gap, A) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
     !any(x -> x == DNA_Gap, B) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
@@ -58,9 +53,10 @@ function nw_align(
     codon_scoring_on=false
     # unpack arguments and call the internal alignment function
     _nw_align(
-        A, B, moveset.vert_moves, moveset.hor_moves, 
-        scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_score_matrix,
-        scoring.edge_ext_begin, scoring.edge_ext_end, codon_scoring_on, do_clean_frameshifts, verbose
+        A, B, moveset.vert_moves, moveset.hor_moves,
+        scoring.extension_score, scoring.edge_ext_begin, scoring.edge_ext_end, scoring.nucleotide_match_score,
+        scoring.nucleotide_mismatch_score, scoring.nucleotide_score_matrix, scoring.codon_match_bonus_score, codon_scoring_on, 
+        do_clean_frameshifts, verbose
     )
 end
 
@@ -118,8 +114,7 @@ function nw_align(;
     scoring::ScoringScheme = STD_SCORING,
     codon_scoring_on::Bool = true,
     do_clean_frameshifts::Bool = false, 
-    verbose::Bool = false
-)
+    verbose::Bool = false)
     # throw exception if input sequences contains gaps
     !any(x -> x == DNA_Gap, ref) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
     !any(x -> x == DNA_Gap, query) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
@@ -132,16 +127,18 @@ function nw_align(;
                                         " - in other words codon insertions or deletions must be allowed."))
     # unpack arguments and call the internal alignment function
     _nw_align(
-        ref, query, moveset.vert_moves, moveset.hor_moves, 
-        scoring.nucleotide_score_matrix, scoring.extension_score, scoring.codon_score_matrix,
-        scoring.edge_ext_begin, scoring.edge_ext_end, codon_scoring_on, do_clean_frameshifts, verbose
+        ref, query, moveset.vert_moves, moveset.hor_moves,
+        scoring.extension_score, scoring.edge_ext_begin, scoring.edge_ext_end, scoring.nucleotide_match_score,
+        scoring.nucleotide_mismatch_score, scoring.nucleotide_score_matrix, scoring.codon_match_bonus_score, codon_scoring_on, 
+        do_clean_frameshifts, verbose
     )
 end
 
 # Needleman Wunsch alignment with affine scoring (internal function)
 @inbounds @fastmath function _nw_align(A::LongDNA{4}, B::LongDNA{4}, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, 
-    nuc_score_matrix::Matrix{Float64}, extension_score::Float64, codon_score_matrix::Matrix{Float64}=BLOSUM62, edge_extension_begin=false::Bool, 
-    edge_extension_end=false::Bool, codon_scoring_on=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y}
+    extension_score::Float64=-0.3, edge_extension_begin=false::Bool, edge_extension_end=false::Bool, nuc_match_score::Float64=0.0,
+    nuc_mismatch_score::Float64=-0.8, nuc_score_matrix::S=nothing, codon_match_bonus_score::Float64=6.0, codon_scoring_on=false::Bool, 
+    do_clean_frameshifts=false::Bool, verbose=false::Bool) where {X, Y, S<:Union{Nothing, Matrix{Float64}}}
 
     n, m = length(A), length(B)
 
@@ -183,13 +180,12 @@ end
                 # performance optimized translation
                 ref_AA = fast_translate((A2[column_index-3],A2[column_index-2],A2[column_index-1]))
                 seq_AA = fast_translate((B2[row_index-3],B2[row_index-2],B2[row_index-1]))
-                # handle stop codons 
-                if ref_AA != stop_aa && seq_AA != stop_aa
-                    # get codon_mismatch_score
-                    codon_match_score = codon_score_matrix[toInt(ref_AA),toInt(seq_AA)]
+                # check if AminoAcids match and handle stop_codons
+                if ref_AA == seq_AA && ref_AA != stop_aa
                     # get nucleotide mismatch_score
-                    match_score = sum(t -> nuc_score_matrix[toInt(A2[column_index - t]), toInt(B2[row_index - t])], 1 : 3)
-                    match_score += codon_match_score
+                    match_score = sum(t -> score_match(A2[column_index-t], B2[row_index-t], nuc_score_matrix, nuc_match_score, nuc_mismatch_score),1:3)
+                    # add codon match bonus
+                    match_score += codon_match_bonus_score
                     # update dp_matrix
                     dp_matrix[row_index, column_index] = max(
                         dp_matrix[row_index, column_index],
@@ -199,7 +195,7 @@ end
             end
 
             # check score if match current pair of nucleotides
-            match_score = nuc_score_matrix[toInt(A2[column_index - 1]), toInt(B2[row_index - 1])]
+            match_score = score_match(A2[column_index-1], B2[row_index-1], nuc_score_matrix, nuc_match_score, nuc_mismatch_score)
             dp_matrix[row_index, column_index] = max(
                 dp_matrix[row_index, column_index], 
                 dp_matrix[row_index-1,column_index-1]+match_score
@@ -325,9 +321,6 @@ end
             # record previous position
             px = x
             py = y
-            #= TODO 
-                I think if we while loop the match codons and nucleotide parts until we are forced to do insertions I think it will be faster maybe.
-            =# 
             # iterate through digonal match moves
             match_Found = false
             if !must_move_hor && !must_move_ver 
@@ -335,14 +328,13 @@ end
                 if codon_scoring_on && (top_sequence_pos) % 3 == 0
                     ref_AA = fast_translate((A2[x-3],A2[x-2],A2[x-1]))
                     seq_AA = fast_translate((B2[y-3],B2[y-2],B2[y-1]))
-                    # TODO handle stop codon more flexibly
-                    if ref_AA != stop_aa && seq_AA != stop_aa
-                        # get codon_match_score
-                        match_score = codon_score_matrix[toInt(ref_AA), toInt(seq_AA)]
-                        # get nucleotide_match_score
-                        match_score += sum(t -> nuc_score_matrix[toInt(A2[x - t]), toInt(B2[y - t])], 1 : 3)
+                    if ref_AA == seq_AA && ref_AA != stop_aa
+                        # get nucleotide mismatch_score
+                        match_score = sum(t -> score_match(A2[x - t], B2[y - t], nuc_score_matrix, nuc_match_score, nuc_mismatch_score),1:3)
+                        # add codon match bouns
+                        match_score += codon_match_bonus_score
                         # check if the move leads to the current cell
-                        if fast_simpler_isapprox(dp_matrix[y, x],dp_matrix[y - 3,x - 3] + match_score)
+                        if fast_simpler_isapprox(dp_matrix[y, x], dp_matrix[y - 3, x - 3] + match_score)
                             # record the path
                             for i ∈ 1:3
                                 push!(res_A, A2[x - i])
@@ -357,9 +349,9 @@ end
 
                 if !match_Found
                     # calculate total (mis-)match score
-                    s = nuc_score_matrix[toInt(A2[x-1]), toInt(B2[y-1])]
+                    s = score_match(A2[x-1], B2[y-1], nuc_score_matrix, nuc_match_score, nuc_mismatch_score)
                     # check if the move leads to the current cell
-                    if fast_simpler_isapprox(dp_matrix[y, x],dp_matrix[y - 1,x - 1] + s)
+                    if fast_simpler_isapprox(dp_matrix[y, x],dp_matrix[y - 1, x - 1] + s)
                         # record the path
                         push!(res_A, A2[x - 1])
                         push!(res_B, B2[y - 1])
@@ -450,6 +442,17 @@ end
     # return alignment
     return aligned_A, aligned_B
 end
+
+function fill_dp_matricies()
+
+end
+
+function backtrack_dp_matrix()
+
+end
+# specialized scoring functions
+@inline score_match(a::DNA, b::DNA, ::Nothing, match_score::Float64, mismatch_score::Float64) = (a == b) ? match_score : mismatch_score
+@inline score_match(a::DNA, b::DNA, M::Matrix{Float64}, match_score::Float64, mismatch_score::Float64) = M[toInt(a), toInt(b)]
 # Didn't give noticiable performance boost
 @inline function fast_simpler_isapprox(a::Float64, b::Float64; eps::Float64=1e-5)
     return abs(a - b) < eps

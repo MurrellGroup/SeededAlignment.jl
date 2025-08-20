@@ -18,7 +18,6 @@ end
     # List of all kmer matches between A and B
     kmer_matches = KmerMatch[]
     # Produce dictionary of all kmers in A
-    # TODO replace Vector{Int64} with NTuple or something that uses repetition_threshold
     # TODO consider replacing keys to Int64
     kmerDict = Dict{LongDNA{4}, Vector{Int64}}()
     for i in 1:m-k+1
@@ -72,22 +71,28 @@ end
     return abs(m - n) * gap_score_estimate + min(m, n) * match_score_estimate
 end
 
+@inline function get_match_score_avg_and_min(M::Matrix{Float64}, match_score::Float64, mismatch_score::Float64)
+    return sum(M)/16, maximum(t -> match_score_matrix[t, t], 1 : 4)
+end
+
+@inline function get_match_score_avg_and_min(::Nothing, match_score::Float64, mismatch_score::Float64)
+    return match_score/4+(3/4)*mismatch_score, match_score
+end
 #kmer selection based on approximated nw_align score
 # TODO look for improvements here
 # TODO preallocate connector kmer_matches
-function select_kmer_path(kmerMatches::Vector{KmerMatch}, m::Int64, n::Int64, match_score_matrix::Matrix{Float64}, 
-    vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, extension_score::Float64, k::Int64) where {X, Y}
+function select_kmer_path(kmerMatches::Vector{KmerMatch}, m::Int64, n::Int64, match_score_matrix::S, match_score::Float64, mismatch_score::Float64,
+    vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, extension_score::Float64, k::Int64) where {X, Y, S<:Union{Nothing, Matrix{Float64}}}
     
     # Produce constants used for estimating scores without A and B
-    min_match_score = maximum(t -> match_score_matrix[t, t], 1 : 4)
+    avg_match_score, min_match_score = get_match_score_avg_and_min(match_score_matrix, match_score, mismatch_score)
+    match_score_estimate = avg_match_score - min_match_score
     gap_score_estimate = maximum(move -> move.score / move.step_length, (vgap_moves..., hgap_moves...))
     # if gap_score_estimate less than extension_score we take an average
     if gap_score_estimate < extension_score
         gap_score_estimate = (gap_score_estimate + 2 * extension_score) / 3
     end
     gap_score_estimate -= min_match_score/2
-    match_score_estimate = sum(match_score_matrix) / 16 - min_match_score
-
     matchCount = length(kmerMatches)
     
     #Produce list of endpoints - two for each kmer

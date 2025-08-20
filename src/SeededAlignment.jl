@@ -4,7 +4,6 @@ module SeededAlignment
 using FASTX
 # export dna sequence datatype
 using BioSequences
-using BioSequences: LongDNA
 export LongDNA
 # exports utilities
 include("utils/fasta_io.jl")

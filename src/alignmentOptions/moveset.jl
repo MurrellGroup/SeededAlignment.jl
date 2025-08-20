@@ -151,6 +151,7 @@ Constants that represents the default codon moveset with frameshift moves allowe
 # default parameter values
 
 ```julia
+# the tuple becomes both insertions and deletions in the moveset
 const STD_CODON_MOVESET = Moveset(
     (
         Move(ref=false, step_length=1, score=-2.0, extendable=true),
@@ -165,7 +166,24 @@ const STD_CODON_MOVESET = Moveset(
         Move(ref=true,  step_length=3, score=-1.0, extendable=true)
     )
 )
-# deletions same as insertions
+
+"""
+    STD_NOISY_MOVESET
+
+Constants that represents codon oblivious moveset that favors gaps of 3. 
+
+# default parameter values
+
+```julia
+# the tuple becomes both insertions and deletions in the moveset
+const STD_NOISY_MOVESET = Moveset(
+    (
+        Move(ref=false, step_length=1, score=-2.0, extendable=true),
+        Move(ref=true,  step_length=3, score=-1.0, extendable=true)
+    )
+)
+```
+"""
 const STD_NOISY_MOVESET = Moveset(
     (
         Move(ref=false, step_length=1, score=-2.0, extendable=false),

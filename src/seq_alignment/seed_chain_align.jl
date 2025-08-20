@@ -37,10 +37,7 @@ alignment = (
 ```
 
 """
-function seed_chain_align(A::LongDNA{4}, B::LongDNA{4};
-    moveset::Moveset = STD_NOISY_MOVESET,
-    scoring::ScoringScheme = STD_SCORING
-)
+function seed_chain_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset = STD_NOISY_MOVESET, scoring::ScoringScheme = STD_SCORING)
     # throw exception if input sequences contains gaps
     !any(x -> x == DNA_Gap, A) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
     !any(x -> x == DNA_Gap, B) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
@@ -57,9 +54,8 @@ function seed_chain_align(A::LongDNA{4}, B::LongDNA{4};
     # force no codon_scoring_on
     codon_scoring_on=false
     # unpack arguments and call the internal alignment function
-    seed_debug_mode=false
     _seed_chain_align(
-        A, B, moveset, scoring, codon_scoring_on, do_clean_frameshifts, verbose, seed_debug_mode=seed_debug_mode
+        A, B, moveset, scoring, codon_scoring_on, do_clean_frameshifts, verbose
     )
 
 end
@@ -123,8 +119,7 @@ function seed_chain_align(;
     scoring::ScoringScheme = STD_SCORING,
     codon_scoring_on::Bool = true,
     do_clean_frameshifts::Bool = false,
-    verbose::Bool = false
-)
+    verbose::Bool = false)
     # throw exception if input sequences contains gaps
     !any(x -> x == DNA_Gap, ref) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
     !any(x -> x == DNA_Gap, query) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
@@ -136,28 +131,30 @@ function seed_chain_align(;
                                         At least one Move in Moveset must consider reference reading (Move.ref=true)
                                          - in other words codon insertions or deletions must be allowed."))
     # unpack arguments and call the internal alignment function
-    seed_debug_mode=false
     _seed_chain_align(
-        ref, query, moveset, scoring, codon_scoring_on, do_clean_frameshifts, verbose, seed_debug_mode=seed_debug_mode
+        ref, query, moveset, scoring, codon_scoring_on, do_clean_frameshifts, verbose
     )
 end
 
 @inbounds function _seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
-    codon_scoring_on=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool; seed_debug_mode=false::Bool)
+    codon_scoring_on=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool) #; seed_debug_mode=true)
 
     # unpack parameters
     k = scoring.kmer_length
     vgap_moves = moveset.vert_moves
     hgap_moves = moveset.hor_moves
-    match_score_matrix = scoring.nucleotide_score_matrix
+    nucleotide_score_matrix = scoring.nucleotide_score_matrix
+    match_score = scoring.nucleotide_match_score
+    mismatch_score = scoring.nucleotide_mismatch_score
+    codon_match_bonus_score = scoring.codon_match_bonus_score
     extension_score = scoring.extension_score
-    codon_score_matrix = scoring.codon_score_matrix
     edge_ext_begin = scoring.edge_ext_begin
     edge_ext_end = scoring.edge_ext_end
     # seeding heuristic
     kmerMatches = find_kmer_matches(A, B, k)
     # two possible seeding heuristics
-    kmerPath = select_kmer_path(kmerMatches, length(A), length(B), match_score_matrix, vgap_moves, hgap_moves, extension_score, k)
+    kmerPath = select_kmer_path(kmerMatches, length(A), length(B), nucleotide_score_matrix, match_score, mismatch_score, 
+        vgap_moves, hgap_moves, extension_score, k)
     #kmerPath = select_max_correlation_kmer_path(kmerMatches, k)
     # parameters for joining kmers/seeds
     extra_kmer_margin = 6
@@ -176,23 +173,25 @@ end
         if !(new_posA == prevA + k && new_posB == prevB + k)
             if prevA == -k+1 && prevB == -k+1
                 # align without cleaning frameshifts
-                alignment = _nw_align(A[prevA + k : new_posA - 1], B[prevB + k : new_posB - 1], vgap_moves, hgap_moves, 
-                    match_score_matrix, extension_score, codon_score_matrix, edge_ext_begin, false, codon_scoring_on
-                )
+                alignment = _nw_align(A[prevA + k : new_posA - 1], B[prevB + k : new_posB - 1], vgap_moves, hgap_moves, extension_score, 
+                    edge_ext_begin, false, match_score, mismatch_score, nucleotide_score_matrix, codon_match_bonus_score, codon_scoring_on)
                 # add alignment unless seed_debug_mode
+                #= (only for internal debug)
                 if seed_debug_mode
                     obfuscate_nucleotides!.(alignment)
                 end
+                =#
                 result .*= alignment
             else
                 # align without cleaning frameshifts
-                alignment = _nw_align(A[prevA + k : new_posA - 1], B[prevB + k : new_posB - 1], vgap_moves, hgap_moves, 
-                    match_score_matrix, extension_score, codon_score_matrix, false, false, codon_scoring_on
-                )
+                alignment = _nw_align(A[prevA + k : new_posA - 1], B[prevB + k : new_posB - 1], vgap_moves, hgap_moves, extension_score, 
+                    false, false, match_score, mismatch_score, nucleotide_score_matrix, codon_match_bonus_score, codon_scoring_on)
                 # add alignment unless seed_debug_mode
+                #= (only for internal debug) 
                 if seed_debug_mode
                     obfuscate_nucleotides!.(alignment)
                 end
+                =#
                 result .*= alignment 
             end
         end
@@ -201,22 +200,23 @@ end
         prevB = new_posB
     end
     # align the remaining parts of the sequences - without cleaning frameshifts
-    alignment = _nw_align(A[prevA + k : end], B[prevB + k : end], vgap_moves, hgap_moves, 
-        match_score_matrix, extension_score, codon_score_matrix, false, edge_ext_end, codon_scoring_on
-    )
+    alignment = _nw_align(A[prevA + k : end], B[prevB + k : end], vgap_moves, hgap_moves, extension_score, 
+        false, edge_ext_end, match_score, mismatch_score, nucleotide_score_matrix, codon_match_bonus_score, codon_scoring_on)
     # add alignment unless seed_debug_mode
+    #= (only for internal debug) 
     if seed_debug_mode
         obfuscate_nucleotides!.(alignment)
     end
+    =#
     result .*= alignment 
     # clean_frameshifts 
-    if do_clean_frameshifts && !seed_debug_mode
+    if do_clean_frameshifts # && !seed_debug_mode (only for internal debug)
         result[1], result[2] = clean_frameshifts(result[1], result[2], verbose = verbose)
     end
     # return result as Tuple
     return result[1], result[2]
 end
-# only for internal debug
+#= (only for internal debug)
 function obfuscate_nucleotides!(seq::LongDNA{4})
     for i in eachindex(seq)
         if seq[i] != DNA_Gap && seq[i] != LongDNA{4}("N")
@@ -224,3 +224,4 @@ function obfuscate_nucleotides!(seq::LongDNA{4})
         end
     end
 end
+=#
