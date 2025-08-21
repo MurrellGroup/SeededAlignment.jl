@@ -6,9 +6,38 @@ end
 
 # seeding functions
 
-# TODO look for improvements here main bottleneck
-# TODO use views and convert kmer to hash_key, then use the hash_key as the key for the dict. 
-@inbounds function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmer_length::Int64; repetition_threshold::Int64 = 5, A_is_ref::Bool=false) 
+# Helper function and types for find_kmer_matches
+# mutable struct optimized for kmerDict
+mutable struct KmerPositions
+    p1::Int
+    p2::Int
+    p3::Int
+    p4::Int
+    p5::Int
+    skip::Bool
+end
+
+# Helper: insert a new position into the first free slot
+@inline function insert!(kp::KmerPositions, pos::Int)
+    if kp.p1 == 0
+        kp.p1 = pos
+    elseif kp.p2 == 0
+        kp.p2 = pos
+    elseif kp.p3 == 0
+        kp.p3 = pos
+    elseif kp.p4 == 0
+        kp.p4 = pos
+    elseif kp.p5 == 0
+        kp.p5 = pos
+    else
+        # purely to set that kmer should be ignored
+        kp.skip = true
+    end
+end
+const repetition_threshold::Int64 = 5
+
+# finds all kmer_matches to be considered
+@inbounds function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmer_length::Int64; A_is_ref::Bool=false) 
 
     # Abbreviations
     k = kmer_length
@@ -18,16 +47,17 @@ end
     # List of all kmer matches between A and B
     kmer_matches = KmerMatch[]
     # Produce dictionary of all kmers in A
-    kmerDict = Dict{UInt64, Vector{Int64}}()
+    kmerDict = Dict{UInt64, KmerPositions}()
     if !A_is_ref
         for i in 1:m-k+1
             hash_key = encode_kmer(A, i, k)
             if haskey(kmerDict, hash_key)
-                if length(kmerDict[hash_key]) <= repetition_threshold
-                    push!(kmerDict[hash_key], i)
+                KP = kmerDict[hash_key]
+                if KP.skip == false
+                    insert!(KP, i)
                 end
             else
-                kmerDict[hash_key] = [i]
+                kmerDict[hash_key] = KmerPositions(i,0,0,0,0, false)
             end
         end
     else
@@ -35,12 +65,12 @@ end
         for i in 1:(m-k+1)÷3
             hash_key = encode_kmer(A, 3*(i-1)+1, k)
             if haskey(kmerDict, hash_key)
-                vec = kmerDict[hash_key]
-                if length(vec) <= repetition_threshold
-                    push!(vec, 3*(i-1)+1)
+                KP = kmerDict[hash_key]
+                if KP.skip == false
+                    insert!(KP, 3*(i-1)+1)
                 end
             else
-                kmerDict[hash_key] = [3*(i-1)+1]
+                kmerDict[hash_key] = KmerPositions(3*(i-1)+1,0,0,0,0, false)
             end
         end
     end
@@ -55,9 +85,11 @@ end
     for iB in 1 : n-k+1
         hash_key = encode_kmer(B, iB, k)
         # skips kmers which are too common in sequence A
-        if (haskey(kmerDict, hash_key) && length(kmerDict[hash_key]) <= repetition_threshold)
+        if (haskey(kmerDict, hash_key) && kmerDict[hash_key].skip == false)
             #Add found match(es) to list
-            for iA in kmerDict[hash_key]
+            KP = kmerDict[hash_key]
+            for iA in (KP.p1, KP.p2, KP.p3, KP.p4, KP.p5)
+                iA == 0 && break
                 diag_idx = iA - iB + n + 1
                 # sufficent condition for no overlap
                 # TODO could be bad if iA is big early because blocks other matches along that diagonal. Remedy was suggested above.
