@@ -6,7 +6,7 @@ Random.seed!(42)
 include("./../noising.jl")
 # sequence_length
 const seqlength = 2001
-const num_seqs = 50
+const num_seqs = 200
 # Initialize dataset
 dataset = Vector{LongDNA{4}}(undef, num_seqs+1)
 # ref sequence

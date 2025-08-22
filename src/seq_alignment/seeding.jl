@@ -9,25 +9,25 @@ end
 # Helper function and types for find_kmer_matches
 # mutable struct optimized for kmerDict
 mutable struct KmerPositions
-    p1::Int
-    p2::Int
-    p3::Int
-    p4::Int
-    p5::Int
+    p1::UInt16
+    p2::UInt16
+    p3::UInt16
+    p4::UInt16
+    p5::UInt16
     skip::Bool
 end
 
 # Helper: insert a new position into the first free slot
-@inline function insert!(kp::KmerPositions, pos::Int)
-    if kp.p1 == 0
+@inline function insert!(kp::KmerPositions, pos::UInt16)
+    if kp.p1 == UInt16(0)
         kp.p1 = pos
-    elseif kp.p2 == 0
+    elseif kp.p2 == UInt16(0)
         kp.p2 = pos
-    elseif kp.p3 == 0
+    elseif kp.p3 == UInt16(0)
         kp.p3 = pos
-    elseif kp.p4 == 0
+    elseif kp.p4 == UInt16(0)
         kp.p4 = pos
-    elseif kp.p5 == 0
+    elseif kp.p5 == UInt16(0)
         kp.p5 = pos
     else
         # purely to set that kmer should be ignored
@@ -38,7 +38,6 @@ const repetition_threshold::Int64 = 5
 
 # finds all kmer_matches to be considered
 @inbounds function find_kmer_matches(A::LongDNA{4}, B::LongDNA{4}, kmer_length::Int64; A_is_ref::Bool=false) 
-
     # Abbreviations
     k = kmer_length
     m = length(A)
@@ -64,24 +63,27 @@ const repetition_threshold::Int64 = 5
         # seeds in A must obide by reading frame
         for i in 1:(m-k+1)÷3
             hash_key = encode_kmer(A, 3*(i-1)+1, k)
+            pos = UInt16(3*(i-1)+1)
             if haskey(kmerDict, hash_key)
                 KP = kmerDict[hash_key]
                 if KP.skip == false
-                    insert!(KP, 3*(i-1)+1)
+                    insert!(KP, pos)
                 end
             else
-                kmerDict[hash_key] = KmerPositions(3*(i-1)+1,0,0,0,0, false)
+                kmerDict[hash_key] = KmerPositions(pos, UInt16(0), UInt16(0), UInt16(0), UInt16(0), false)
             end
         end
     end
 
     # Search B for any matching kmers
-    diagonals = fill(typemin(Int64), m+n)
+    diagonals = fill(typemin(UInt16), m+n)
     #= diagonals[i] = the rightmost kmer start_index in A that matches with a kmer of B in diagonal i. 
     Used to avoid overlapping kmerMatches=#
 
-    #= TODO improvement idea - find all kmerMatches on diagional i. Sort them, itterate, check if current KmerMatch 
-    overlaps with previous added KmerMatch. On the other hand this causes more kmerMatches to appear and make the alignment slower overall.=#
+    #= NOTE: improvement idea if alignment quality is lacking - 
+        IDEA: find all kmerMatches on diagional i. Sort them, itterate, check if current KmerMatch overlaps with previously added KmerMatch. 
+        On the other hand this causes more kmerMatches to appear and make the alignment slower overall.
+    =#
     for iB in 1 : n-k+1
         hash_key = encode_kmer(B, iB, k)
         # skips kmers which are too common in sequence A
@@ -91,8 +93,11 @@ const repetition_threshold::Int64 = 5
             for iA in (KP.p1, KP.p2, KP.p3, KP.p4, KP.p5)
                 iA == 0 && break
                 diag_idx = iA - iB + n + 1
+                #= 
+                    NOTE: if iA is big early then it could impact alignment quality because it blocks 
+                    other matches along that diagonal. Remedy was suggested above. But repetition_threshold makes this less likely
+                =#
                 # sufficent condition for no overlap
-                # TODO could be bad if iA is big early because blocks other matches along that diagonal. Remedy was suggested above.
                 if diagonals[diag_idx] + k <= iA
                     push!(kmer_matches, KmerMatch(iA, iB))
                     diagonals[diag_idx] = iA
@@ -100,7 +105,7 @@ const repetition_threshold::Int64 = 5
             end
         end
     end
-
+    
     return kmer_matches
 end
 

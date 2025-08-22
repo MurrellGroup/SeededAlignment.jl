@@ -124,7 +124,7 @@ function find_triplet_insertions_codonindex(aligned_ref::LongDNA{4})
     return insertion_length_dict
 end
 
-function scaffold_msa_from_pairwise(cleaned_refs::Vector{LongDNA{4}}, cleaned_seqs::Vector{LongDNA{4}})
+@inbounds @fastmath function scaffold_msa_from_pairwise(cleaned_refs::Vector{LongDNA{4}}, cleaned_seqs::Vector{LongDNA{4}})
     ref = ungap(cleaned_refs[1])
     # NOTE: we assume that all cleaned_refs represent the same sequence
     # !any(ref != ungap(cleaned_refs[i]) for i in 2:length(cleaned_refs)) || throw(ArgumentError(""))

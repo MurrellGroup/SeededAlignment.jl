@@ -260,7 +260,7 @@ function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seqs::Vector{LongDNA
         cleaned_seqs[i] = cleaned_seq
     end
     # scaffold the cleaned pairwise alignments into new frameshift-free multiple sequence alignment
-    cleaned_msa = scaffold_msa_from_pairwise(cleaned_refs, cleaned_seqs) # TODO poorly optimized
+    cleaned_msa = scaffold_msa_from_pairwise(cleaned_refs, cleaned_seqs)
     return cleaned_msa
 end
 

@@ -123,6 +123,7 @@ function seed_chain_align(;
     # throw exception if input sequences contains gaps
     !any(x -> x == DNA_Gap, ref) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
     !any(x -> x == DNA_Gap, query) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
+    (scoring.kmer_length % 3 == 0) || throw(ArgumentError("kmer_length must be divisible by 3 if using reference as codon reading frame anchor!"))
     # throw exception if invalid nucleotide letter in LongDNA{4}
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), ref) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), query) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
