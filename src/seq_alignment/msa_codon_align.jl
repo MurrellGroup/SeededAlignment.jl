@@ -50,8 +50,7 @@ function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}};
         scoring::ScoringScheme=STD_SCORING, 
         codon_scoring_on::Bool = true,
         verbose::Bool = false,
-        use_seeded::Bool = true
-)
+        use_seeded::Bool = true)
     # perform pairwise seeded alignment for each sequence and clean indels which violate the reference readingFrame
     cleaned_refs, cleaned_seqs = align_all_to_reference(ref, seqs, 
         moveset = moveset, 
@@ -67,13 +66,12 @@ function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}};
 end
 
 function align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; 
-        moveset::Moveset, 
-        scoring::ScoringScheme, 
+        moveset::Moveset = STD_CODON_MOVESET, 
+        scoring::ScoringScheme = STD_SCORING,
         codon_scoring_on=true::Bool, 
         do_clean_frameshifts=true::Bool,
         verbose::Bool = false,
-        use_seeded::Bool = true
-)
+        use_seeded::Bool = true)
     # Initialize space for alignment
     aligned_seqs = Vector{LongDNA{4}}(undef,length(seqs))
     aligned_refs = Vector{LongDNA{4}}(undef,length(seqs))
@@ -101,125 +99,127 @@ end
 
 # NOTE assume no single indels and codon_respecting insertions 0 mod 3
 function find_triplet_insertions_codonindex(aligned_ref::LongDNA{4})
-    # TODO check for non-codon-respecting indels
-    #@show length(aligned_ref)
-    #@show length(ungap(aligned_ref))
-    #@show aligned_ref
-    #@assert length(ungap(aligned_ref)) % 3 == 0
-    
-
     # NOTE codon_pos denotes which codon is in front of the insertion
-    # find where the insertions happened relativ to codons in the reference
-    codon_length = length(ungap(aligned_ref))÷3 # floor division
-    insertion_codonindex_list = zeros(Int64, codon_length+1)
-    insertionFlag = false
+    codon_length = sum(!isgap, aligned_ref) ÷ 3
+    #insertion_length_dict = dict{Int64, Int64}()
+    insertion_length_dict = zeros(Int64, codon_length+1)
     cur_insertion_length = 0
-    pos = 1
-    codon_pos = 1 
-    # loop through aligned_ref to find codon insertions
-    while pos <= length(aligned_ref)
-        if aligned_ref[pos] == DNA_Gap
+    codon_pos = 1
+    # find where the insertions happened relativ to codons in the reference
+    @inbounds for i in 1:3:length(aligned_ref)
+        if aligned_ref[i] == DNA_Gap && aligned_ref[i+1] == DNA_Gap && aligned_ref[i+2] == DNA_Gap
             cur_insertion_length += 3
-            if !insertionFlag
-                insertionFlag = true
-            end
-        else 
-            if insertionFlag
-                insertionFlag = false
-                insertion_codonindex_list[codon_pos] = cur_insertion_length
+        else
+            if cur_insertion_length > 0
+                insertion_length_dict[codon_pos] = cur_insertion_length
                 cur_insertion_length = 0
-                codon_pos += 1
-            else
-                codon_pos += 1
             end
+            codon_pos += 1
         end
-        pos += 3
     end
+    # add insertion that might occur at the end
     if cur_insertion_length > 0
-        insertion_codonindex_list[end] = cur_insertion_length
+        insertion_length_dict[codon_length+1] = cur_insertion_length
     end
-    return insertion_codonindex_list
+    return insertion_length_dict
 end
 
-# TODO implement the speedup version of this
 function scaffold_msa_from_pairwise(cleaned_refs::Vector{LongDNA{4}}, cleaned_seqs::Vector{LongDNA{4}})
-    
     ref = ungap(cleaned_refs[1])
     # NOTE: we assume that all cleaned_refs represent the same sequence
-    #!any(ref != ungap(cleaned_refs[i]) for i in 2:length(cleaned_refs)) || throw(ArgumentError(""))
-    
+    # !any(ref != ungap(cleaned_refs[i]) for i in 2:length(cleaned_refs)) || throw(ArgumentError(""))
+
     # bookkeeping variables
     n_seqs = length(cleaned_seqs)
     ref_insert_addon = 0
-    codon_length = (length(ungap(ref))÷3)
-    cleaned_codon_alignment = Vector{LongDNA{4}}(undef, n_seqs+1)
+    codon_length = length(ref) ÷ 3
+    # find codon_insertions to resolve
     insertion_bookeeping_matrix = zeros(Int64,n_seqs,codon_length+1)
-
     for i in 1:n_seqs
-        # backbone of our msa
-        cleaned_codon_alignment[i+1] = cleaned_seqs[i]
-        # keep track where the codon insertions are happening
+        # keep track where the codon insertions are happening # swap columns and rows
         insertion_bookeeping_matrix[i,:] = find_triplet_insertions_codonindex(cleaned_refs[i])
     end
-    cleaned_codon_alignment[1] = ref
-
+    # find longest gaps
+    longest_gap_vec = zeros(Int64, codon_length+1)
+    total_gap_insert_len = 0
+    for codon_index in 1:codon_length+1
+        gap_insert_len = maximum(insertion_bookeeping_matrix[:,codon_index])
+        longest_gap_vec[codon_index] = gap_insert_len
+        total_gap_insert_len += gap_insert_len
+    end
+    # get length of alignment
+    alignment_codon_length = 3*codon_length+total_gap_insert_len
+    # preallocate msa
+    cleaned_codon_msa = LongDNA{4}[LongDNA{4}("A"^(alignment_codon_length)) for _ in 1:(n_seqs+1)]
+    # matrix to keep track of insertions for indexing
+    insertion_addon = zeros(Int64, n_seqs)
     # visually fix the codon insertions by that we left-stack codon insertions at each insertion intervall.
-    for codon_index in 1:(codon_length+1) 
-        
-        # TODO this can be speedup by avoiding concatenation and using push! or append! instead.
-        # TODO ALTERNATIVELY try copyto! still probably slower
-
-        # check for insertions that end at the codon_index:th codon relativ to reference
-        longest_insert = maximum(insertion_bookeeping_matrix[:,codon_index])
+    for codon_index in 1:codon_length
+        longest_insert = longest_gap_vec[codon_index]
+        cur_pos = 3*(codon_index-1)+ref_insert_addon+1
         if longest_insert > 0
-            if codon_index == 1
-
-                cleaned_codon_alignment[1] = repeat(LongDNA{4}("-"), longest_insert) * cleaned_codon_alignment[1][1:end]
-                for seqId in 1:n_seqs
-                    insertion_gap_length = insertion_bookeeping_matrix[seqId,codon_index]
-                    if !(insertion_gap_length == longest_insert)
-                        cleaned_codon_alignment[seqId+1] = (
-                        cleaned_codon_alignment[seqId+1][1:insertion_gap_length] * 
-                        repeat(LongDNA{4}("-"), longest_insert-insertion_gap_length) * 
-                        cleaned_codon_alignment[seqId+1][insertion_gap_length+1:end]
-                        )
-                    end
+            # add insert and codon for ref
+            for j in cur_pos:cur_pos+longest_insert-1
+                cleaned_codon_msa[1][j] = DNA_Gap
+            end
+            # add codon
+            for j in 1:3
+                cleaned_codon_msa[1][cur_pos+longest_insert+j-1] = ref[3*(codon_index-1)+j]
+            end
+            # add inserted codons, gaps and ref codon match
+            for seqId in 2:n_seqs+1
+                insertion_gap_length = insertion_bookeeping_matrix[seqId-1,codon_index]
+                insert_offset = insertion_addon[seqId-1]
+                for j in cur_pos:cur_pos+insertion_gap_length-1
+                    cleaned_codon_msa[seqId][j] = cleaned_seqs[seqId-1][j-insert_offset]
                 end
-                    
-            elseif codon_index == codon_length+1
-
-                cleaned_codon_alignment[1] = cleaned_codon_alignment[1][1:end] * repeat(LongDNA{4}("-"), longest_insert)
-                for seqId in 1:n_seqs
-                    insertion_gap_length = insertion_bookeeping_matrix[seqId,codon_index]
-                    if !(insertion_gap_length == longest_insert)
-                        cleaned_codon_alignment[seqId+1] = (
-                        cleaned_codon_alignment[seqId+1][1:end] * 
-                        repeat(LongDNA{4}("-"), longest_insert-insertion_gap_length) 
-                        )
-                    end
+                # add gaps
+                for j in cur_pos+insertion_gap_length:cur_pos+longest_insert-1
+                    cleaned_codon_msa[seqId][j] = DNA_Gap
                 end
-
-            else
-
-                cleaned_codon_alignment[1] = (
-                cleaned_codon_alignment[1][1:3*(codon_index-1)+ref_insert_addon] * 
-                repeat(LongDNA{4}("-"), longest_insert) *
-                cleaned_codon_alignment[1][3*(codon_index-1)+ref_insert_addon+1:end]
-                )
-                for seqId in 1:n_seqs
-                    insertion_gap_length = insertion_bookeeping_matrix[seqId,codon_index]
-                    if !(insertion_gap_length == longest_insert)
-                        cleaned_codon_alignment[seqId+1] = (
-                        cleaned_codon_alignment[seqId+1][1:3*(codon_index-1)+ref_insert_addon+insertion_gap_length] * 
-                        repeat(LongDNA{4}("-"), longest_insert-insertion_gap_length) * 
-                        cleaned_codon_alignment[seqId+1][1+3*(codon_index-1)+ref_insert_addon+insertion_gap_length:end]
-                        )
-                    end
+                #update offset
+                insert_offset += (longest_insert-insertion_gap_length)
+                # add codon
+                for j in cur_pos+longest_insert:cur_pos+longest_insert+2
+                    cleaned_codon_msa[seqId][j] = cleaned_seqs[seqId-1][j-insert_offset]
                 end
+                # update offset vector for later use 
+                insertion_addon[seqId-1] = insert_offset
             end
             ref_insert_addon += longest_insert
+        else
+            for j in cur_pos:cur_pos+2 
+                cleaned_codon_msa[1][j] = ref[j-ref_insert_addon]
+            end
+            for seqId in 2:n_seqs+1
+                insert_offset = insertion_addon[seqId-1]
+                for j in cur_pos:cur_pos+2
+                    cleaned_codon_msa[seqId][j] = cleaned_seqs[seqId-1][j-insert_offset]
+                end
+            end
         end
     end
-
-    return cleaned_codon_alignment
+    # handle codon_index = codon_length+1 case
+    codon_index = codon_length+1
+    longest_insert = longest_gap_vec[codon_index]
+    cur_pos = 3*(codon_index-1)+ref_insert_addon+1
+    if longest_insert > 0
+        # add insert and codon for ref
+        for j in cur_pos:cur_pos+longest_insert-1
+            cleaned_codon_msa[1][j] = DNA_Gap
+        end
+        # add inserted codons and gaps
+        for seqId in 2:n_seqs+1
+            insertion_gap_length = insertion_bookeeping_matrix[seqId-1,codon_index]
+            insert_offset = insertion_addon[seqId-1]
+            for j in cur_pos:cur_pos+insertion_gap_length-1
+                cleaned_codon_msa[seqId][j] = cleaned_seqs[seqId-1][j-insert_offset]
+            end
+            # add gaps
+            for j in cur_pos+insertion_gap_length:cur_pos+longest_insert-1
+                cleaned_codon_msa[seqId][j] = DNA_Gap
+            end
+        end
+    end
+    return cleaned_codon_msa
 end
