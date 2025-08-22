@@ -117,7 +117,7 @@ function seed_chain_align(;
     query::LongDNA{4},
     moveset::Moveset = STD_CODON_MOVESET,
     scoring::ScoringScheme = STD_SCORING,
-    codon_scoring_on::Bool = true,
+    codon_scoring_on::Bool = false,
     do_clean_frameshifts::Bool = false,
     verbose::Bool = false)
     # throw exception if input sequences contains gaps
@@ -138,7 +138,7 @@ function seed_chain_align(;
 end
 
 @inbounds @fastmath function _seed_chain_align(A::LongDNA{4}, B::LongDNA{4}, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
-    codon_scoring_on=true::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool, A_is_ref::Bool=false)
+    codon_scoring_on=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool, A_is_ref::Bool=false)
 
     n, m = length(A), length(B)
     # unpack parameters

@@ -163,8 +163,10 @@ function _clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; ve
             else
                 println("middle codon is edited!")
                 println("ref: ", ref[3*(codon_index-2)+1:3*(codon_index+1)])
-                println("original alignment_ref: ", aligned_ref[cur_pos-3:last_alignment_index])
-                println("original alignment_seq: ", aligned_seq[cur_pos-3:last_alignment_index])
+                print("original alignment_ref: ")
+                color_diff(aligned_ref[cur_pos-3:last_alignment_index],cleaned_ref[length(cleaned_ref)-5:end], second=false)
+                print("original alignment_seq: ", )
+                color_diff(aligned_seq[cur_pos-3:last_alignment_index],cleaned_seq[length(cleaned_ref)-5:end], second=false)
                 println("cleaned alignment_ref:  ", cleaned_ref[length(cleaned_ref)-5:end])
                 println("cleaned alignment_seq:  ", cleaned_seq[length(cleaned_seq)-5:end])
                 println("_____________________________________________________")
@@ -190,9 +192,9 @@ function _clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; ve
     # explain results of clean_up
     if verbose
         if total_num_of_clean_up_operations != 0
-            println("Alignment had frameshift mutations:\nIn total $total_num_insertion_gaps_cleaned insertion(s) were removed and $total_num_deletion_gaps_cleaned ambigious nucleotide(s) were added to non-reference sequence")
+            println("Alignment had frameshift mutations:\nIn total $total_num_insertion_gaps_cleaned insertion(s) were removed and $total_num_deletion_gaps_cleaned ambigious nucleotide(s) were added to non-reference sequence\n")
         else
-            println("Alignment has no frameshift mutations - no clean up needed.")
+            println("Alignment has no frameshift mutations - no clean up needed.\n")
         end
     end
     return cleaned_ref, cleaned_seq
@@ -308,4 +310,39 @@ end
         end
     end
     return false
+end
+# to display colour
+function color_diff(s1::BioSequence{T}, s2::BioSequence{T}; first=true, second=true) where T<:Alphabet
+    red   = "\033[31m"
+    reset = "\033[0m"
+
+    n = max(length(s1), length(s2))
+    m = min(length(s1), length(s2))
+    if first
+        # First string
+        for i in 1:n
+            if i > m
+                print(s1[i]) 
+            elseif s1[i] == s2[i]
+                print(s1[i])               # normal
+            else
+                print(red, s1[i], reset)   # colored
+            end
+        end
+        println()
+    end
+
+    if second
+        # Second string
+        for i in 1:n
+            if i > m
+                print(s2[i]) 
+            elseif s1[i] == s2[i]
+                print(s2[i])               # normal
+            else
+                print(red, s2[i], reset)   # colored
+            end
+        end
+        println()
+    end
 end

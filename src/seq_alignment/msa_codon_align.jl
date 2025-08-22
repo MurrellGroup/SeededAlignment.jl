@@ -83,6 +83,9 @@ function align_all_to_reference(ref::LongDNA{4}, seqs::Vector{LongDNA{4}};
     # perform alignment for each sequence w.r.t. reference sequence
     for seqId in 1:length(seqs)
         # cleaned pairwise alignments
+        if verbose
+            println("sequence number: ",seqId, " ", "clean up results:\n")
+        end
         aligned_ref, aligned_seq = align(
             ref = ref, 
             query = seqs[seqId], 
