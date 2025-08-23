@@ -162,8 +162,8 @@ const STD_CODON_MOVESET = Moveset(
 """
 const STD_CODON_MOVESET = Moveset(
     (
-        Move(ref=false, step_length=1, score=-2.0, extendable=true),
-        Move(ref=true,  step_length=3, score=-1.0, extendable=true)
+        Move(ref=false, step_length=1, score=-2.5, extendable=false),
+        Move(ref=true,  step_length=3, score=-2.0, extendable=true)
     )
 )
 
@@ -186,7 +186,7 @@ const STD_NOISY_MOVESET = Moveset(
 """
 const STD_NOISY_MOVESET = Moveset(
     (
-        Move(ref=false, step_length=1, score=-2.0, extendable=false),
-        Move(ref=false, step_length=3, score=-1.0, extendable=true)
+        Move(ref=false, step_length=1, score=-2.5, extendable=false),
+        Move(ref=false, step_length=3, score=-2.0, extendable=true)
     )
 )

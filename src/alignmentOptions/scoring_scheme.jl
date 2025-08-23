@@ -78,7 +78,7 @@ end
 		edge_ext_begin::Bool=true,
 		edge_ext_end::Bool=true,
 		nucleotide_match_score::Float64 = 0.0,
-		nucleotide_mismatch_score::Float64 = -0.8,
+		nucleotide_mismatch_score::Float64 = -0.4,
 		nucleotide_score_matrix::Union{Nothing,Matrix{Float64}} = nothing
 		codon_match_bonus_score::Float64 = 6.0
 )
@@ -113,14 +113,14 @@ seed_chain_align(A,B scoring=score_params)
 
 """
 function ScoringScheme(; 
-	extension_score::Float64=-0.3, 
+	extension_score::Float64=-0.6, 
 	kmer_length::Int64=12, 
 	edge_ext_begin=true::Bool, 
 	edge_ext_end=true::Bool,
 	nucleotide_match_score::Float64 = 0.0,
-	nucleotide_mismatch_score::Float64 = -0.8,
+	nucleotide_mismatch_score::Float64 = -0.3,
 	nucleotide_score_matrix=nothing,
-	codon_match_bonus_score::Float64 = 6.0,
+	codon_match_bonus_score::Float64 = 3.0,
 )
 	# call actual constructor
 	ScoringScheme(extension_score, kmer_length, edge_ext_begin, edge_ext_end, nucleotide_match_score, 
@@ -166,7 +166,7 @@ const STD_SCORING = ScoringScheme(
 	kmer_length=12,
 	edge_ext_begin=true,
 	edge_ext_end=true,
-	nucleotide_mismatch_score = -0.8,
+	nucleotide_mismatch_score = -0.4,
 	nucleotide_match_score = 0.0,
 	codon_match_bonus_score = 6.0
 )

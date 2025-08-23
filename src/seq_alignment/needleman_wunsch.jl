@@ -42,10 +42,12 @@ function nw_align(A::LongDNA{4}, B::LongDNA{4}; moveset::Moveset = STD_NOISY_MOV
     # throw exception if invalid nucleotide letter in LongDNA{4}
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), A) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), B) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
-    # check no reference informed moves (Moev.ref=true) in moveset
+    # check no reference informed moves (Move.ref=true) in moveset
     !contains_ref_move(moveset) || throw(ArgumentError("Moveset contains move(s) that considers reading frame (Move.ref=true)", 
                                                        " when no reference sequence was given!\n","Either set Move.ref=false for all moves in moveset", 
                                                     "if you want to align without a reference sequence. Specify by nw_align(ref=seq1, query=seq2)."))
+    # give warning if not already given
+    already_warned_nw[] || (@warn "Running codon-blind alignment (DE-NOVO). If this was not your intention run with nw_align(ref=seq1, query=seq2) instead."; already_warned_nw[] = true)
     # force no clean_up
     do_clean_frameshifts=false
     verbose=false
@@ -66,8 +68,8 @@ end
         	query::LongDNA{4}, 
         	moveset::Moveset = STD_CODON_MOVESET, 
         	scoring::ScoringScheme = STD_SCORING,
-        	codon_scoring_on::Bool = true,
-        	do_clean_frameshifts::Bool = false, 
+        	codon_scoring_on::Bool = false,
+        	do_clean_frameshifts::Bool = true, 
         	verbose::Bool = false)
 
 (Needleman-wunsch wrapper - CODING given trusted CDS anchor/reference)
@@ -81,8 +83,8 @@ Produces an optimal global pairwise alignment of two ungapped CDS (Coding DNA Se
 - `query::LongDNA{4}`: CDS (with possible frameshifts due to e.g. sequencing or annotation errors) which is aligned to `ref` and adopts its reading frame coordinates. 
 - `moveset::Moveset = STD_CODON_MOVESET`: Defines allowable alignment moves (e.g. insertions/deletions and their penalty)
 - `scoring::ScoringScheme = STD_SCORING`: Defines alignment scoring together with moveset
-- `codon_scoring_on::Bool = true`: Whether to apply additional scoring on codon-level 
-- `do_clean_frameshifts::Bool = false`: Whether to clean the alignment output of gaps which cause frameshifts (IMPORTANT: produces a protein alignment on a nucleotide level)
+- `codon_scoring_on::Bool = false`: Whether to apply additional scoring on codon-level 
+- `do_clean_frameshifts::Bool = true`: Whether to clean the alignment output of gaps which cause frameshifts (IMPORTANT: produces a protein alignment on a nucleotide level)
 - `verbose::Bool = false`: Whether to verbosely display what edits were made during the cleaning of frameshifts. 
 
 # Returns
@@ -112,8 +114,8 @@ function nw_align(;
     query::LongDNA{4}, 
     moveset::Moveset = STD_CODON_MOVESET, 
     scoring::ScoringScheme = STD_SCORING,
-    codon_scoring_on::Bool = true,
-    do_clean_frameshifts::Bool = false, 
+    codon_scoring_on::Bool = false,
+    do_clean_frameshifts::Bool = true, 
     verbose::Bool = false)
     # throw exception if input sequences contains gaps
     !any(x -> x == DNA_Gap, ref) || throw(ArgumentError("Input sequence contains gaps! - Sequences must be ungapped!"))
@@ -121,6 +123,8 @@ function nw_align(;
     # throw exception if invalid nucleotide letter in LongDNA{4}
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), ref) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
     all(x -> x in (DNA_A, DNA_T, DNA_C, DNA_G), query) || throw(ArgumentError("Input sequence contains non-standard nucleotides! \nThe only accepted symbols are 'A', 'C', 'T' and 'G'"))
+    # check ref length is divisible by 3
+    (length(ref) % 3 == 0) || throw(ArgumentError("Invalid reference sequence! - length must be divisible by 3"))
     # check that moveset takes reference reading frame into account
     contains_ref_move(moveset) || throw(ArgumentError("Invalid Moveset for reference to query alignment!\n", 
                                         "At least one Move in Moveset must consider reference reading (Move.ref=true)",
@@ -444,3 +448,5 @@ end
 @inline function fast_simpler_isapprox(a::Float64, b::Float64; eps::Float64=1e-5)
     return abs(a - b) < eps
 end
+
+const already_warned_nw = Ref(false)

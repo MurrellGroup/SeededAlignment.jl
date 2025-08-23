@@ -50,3 +50,17 @@ const CODON_TABLE::Vector{AminoAcid} = AminoAcid[
     hash_index = (i1 - 1)*16 + (i2 - 1)*4 + i3
     return SeededAlignment.CODON_TABLE[hash_index]
 end
+
+# test matrix
+
+# Parameters
+α = 2.0   # transition rate
+β = 1.0   # transversion rate
+# Explicit 4x4 K2P rate matrix Q
+# Order: A C G T 
+const NUC_SUB_MATRIX = [
+    (2*β+α)   -β         -α       -β;
+         -β   (2*β+α)    -β       -α;
+         -α     -β     (2*β+α)    -β;
+         -β     -α         -β   (2*β+α)
+]

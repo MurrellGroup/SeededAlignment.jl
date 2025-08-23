@@ -57,28 +57,40 @@ include("../benchmark/noising.jl")
         A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 330)
         B = mutateSequence(A, codon_indel_avg = 2.0, frameshift_indel_avg = 0.0, sub_mutation_avg = 0.0, verbose=false)
         # reference informed alignment
-        aligned_A, aligned_B = nw_align(ref = A, query = B, moveset=move_set)
+        aligned_A, aligned_B = nw_align(ref = A, query = B, do_clean_frameshifts=false)
         # 2.1 alignment doesn't alter the underlying sequences
         @testset "2.1 alignment doesn't alter the underlying sequences" begin
             @test ungap(aligned_A) == A && ungap(aligned_B) == B
         end
+        aligned_A, aligned_B = nw_align(ref = A, query = B, do_clean_frameshifts=true)
         # 2.2 aligned_sequences have the same length
         @testset "2.2 aligned_sequences have the same length" begin
 	        @test length(aligned_A) == length(aligned_B)
         end
         # 2.3 indels don't break codon readingframe
         @testset "2.3 indels don't break codon readingframe" begin
-        # extension at edges turned off
-        # reference informed alignment
-        aligned_A, aligned_B = nw_align(ref = A, query = B, moveset=move_set)
-        # check if any clean up was needed
-        @test ungap(aligned_A) == A
-        @test ungap(aligned_B) == B
-        end 
+            # reference informed alignment
+            aligned_A, aligned_B = nw_align(ref = A, query = B, moveset=move_set)
+            # check if any clean up was needed
+            @test ungap(aligned_A) == A
+            @test ungap(aligned_B) == B
+        end
+        # 2.4 test custom nucleotide substitution matrix
+        @testset "2.4 test custom nucleotide substitution matrix" begin
+            scoring_scheme = ScoringScheme(nucleotide_score_matrix=SeededAlignment.NUC_SUB_MATRIX)
+            # should not detect frameshifts based on how B is made. 
+            aligned_A, aligned_B = nw_align(ref=A, query=B, scoring=scoring_scheme)
+            @test typeof(@inferred nw_align(ref=A, query=B, scoring=scoring_scheme)) == Tuple{LongDNA{4},LongDNA{4}}
+            @test ungap(aligned_A) == A && ungap(aligned_B) == B
+	        @test length(aligned_A) == length(aligned_B)
+        end
+        # 2.5 type inferrence
+        @testset "2.5 type inferrence" begin
+            @test typeof(@inferred nw_align(ref=A, query=B)) == Tuple{LongDNA{4},LongDNA{4}}
+        end
     end
 
     @testset "3. noisy alignment seed_chain_align" begin
-        # TODO better to use more similar sequences so it finds more kmers
         Random.seed!(42)
         A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 1001)
         B = mutateSequence(A, verbose=false)
@@ -103,11 +115,11 @@ include("../benchmark/noising.jl")
                 ref_insertions = (Move(ref=true, step_length=3, score=-10.0, extendable=true),),
                 ref_deletions =  (Move(ref=true, step_length=3, score=-10.0, extendable=true),)
             )
-        Random.seed!(42) # TODO better to use more similar sequences so it finds more kmers
+        Random.seed!(42)
         A = randseq(DNAAlphabet{4}(), SamplerUniform(dna"ACGT"), 330)
-        B = mutateSequence(A, codon_indel_avg = 2.0, frameshift_indel_avg = 0.0, sub_mutation_avg = 0.0, verbose=false)
+        B = mutateSequence(A, codon_indel_avg = 2.0, frameshift_indel_avg = 0.0, sub_mutation_avg = 2.0, verbose=false)
         # reference informed alignment
-        aligned_A, aligned_B = seed_chain_align(ref = A, query = B, moveset=move_set)
+        aligned_A, aligned_B = seed_chain_align(ref = A, query = B, do_clean_frameshifts=false)
         # 4.1 alignment doesn't alter the underlying sequences
         @testset "4.1 alignment doesn't alter the underlying sequences" begin
             @test ungap(aligned_A) == A && ungap(aligned_B) == B

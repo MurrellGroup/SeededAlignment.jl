@@ -48,7 +48,7 @@ msa[4] == LongDNA{4}("---ATG------CCCGGG------")
 function msa_codon_align(ref::LongDNA{4}, seqs::Vector{LongDNA{4}}; 
         moveset::Moveset=STD_CODON_MOVESET, 
         scoring::ScoringScheme=STD_SCORING, 
-        codon_scoring_on::Bool = true,
+        codon_scoring_on::Bool = false,
         verbose::Bool = false,
         use_seeded::Bool = true)
     # perform pairwise seeded alignment for each sequence and clean indels which violate the reference readingFrame
