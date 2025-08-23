@@ -186,7 +186,7 @@ end
     # add kmer
     for idx in 0:k-1
         push!(resultA, A[kmer.posA+idx])
-        push!(resultB, A[kmer.posB+idx])
+        push!(resultB, B[kmer.posB+idx])
     end
     prevA = kmer.posA
     prevB = kmer.posB
@@ -202,7 +202,7 @@ end
         # add kmer
         for idx in 0:k-1
             push!(resultA, A[kmer.posA+idx])
-            push!(resultB, A[kmer.posB+idx])
+            push!(resultB, B[kmer.posB+idx])
         end 
         prevA = kmer.posA
         prevB = kmer.posB
