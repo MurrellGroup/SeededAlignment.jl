@@ -6,8 +6,7 @@ function mutateSequence(org_seq::LongDNA{4};
     codon_indel_avg::Float64 = 5.0, 
     frameshift_indel_avg::Float64 = 3.0,
     sub_mutation_avg::Float64 = 5.0,
-    verbose=true
-)
+    verbose=true)
     # initialize mutations
     seq = copy(org_seq)
     n = length(seq)
@@ -15,6 +14,11 @@ function mutateSequence(org_seq::LongDNA{4};
     num_codon_indels = rand(Poisson(codon_indel_avg))
     num_frameshifts = rand(Poisson(frameshift_indel_avg))
     num_sub_mutations = rand(Poisson(sub_mutation_avg))
+    # Distributions for codon_indel lengths
+    λ_insert = 1.5   # mean codon insertion length
+    insert_dist = Poisson(λ_insert)
+    λ_delete = 2.0   # mean codon deletion length
+    delete_dist = Poisson(λ_delete)
     # count mutation types
     cnt_codon_del = 0
     cnt_codon_ins = 0
@@ -31,9 +35,8 @@ function mutateSequence(org_seq::LongDNA{4};
             if verbose
                 println("insert")
             end
-            # insertion
-            # length = rand(1:4)
-            len = 1
+            # Sample lengths
+            len = min(rand(insert_dist), 10)
             inserted_codon = get_rand_non_stop_codons(num_codons = len)
             seq = seq[1:3*indel_pos] * inserted_codon * seq[3*indel_pos + 1 : end]
             n += 3*len
@@ -42,9 +45,11 @@ function mutateSequence(org_seq::LongDNA{4};
             if verbose
                 println("deletion")
             end
-            cnt_codon_del += 1
-            seq = seq[1:3*indel_pos] * seq[3*indel_pos + 4 : end]
-            n -= 3
+             # sample deletion length
+            len = min(rand(delete_dist), 10)
+            seq = seq[1:3*indel_pos] * seq[3*indel_pos+1+3*len : end]
+            n -= 3*len
+            cnt_codon_del += len
         end
     end
     # frameshift mutations

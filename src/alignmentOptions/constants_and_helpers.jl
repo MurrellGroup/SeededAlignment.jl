@@ -54,13 +54,13 @@ end
 # test matrix
 
 # Parameters
-α = 2.0   # transition rate
-β = 1.0   # transversion rate
+α = -0.4   # transition rate
+β = -0.2   # transversion rate
 # Explicit 4x4 K2P rate matrix Q
 # Order: A C G T 
 const NUC_SUB_MATRIX = [
-    (2*β+α)   -β         -α       -β;
-         -β   (2*β+α)    -β       -α;
-         -α     -β     (2*β+α)    -β;
-         -β     -α         -β   (2*β+α)
+    0   -β         -α       -β;
+         -β   0    -β       -α;
+         -α     -β     0    -β;
+         -β     -α         -β   0
 ]
