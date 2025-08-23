@@ -13,16 +13,14 @@ dataset = Vector{LongDNA{4}}(undef, num_seqs+1)
 ref = generate_random_ref(seqlength÷3)
 dataset[1] = ref
 # generate shared mutations
-# TODO stack mutations for more complex alignment dataset
 shared_mutation = mutateSequence(ref,
-    codon_indel_avg=5.0,
-    frameshift_indel_avg=1.0,
-    sub_mutation_avg = 2.0
+    codon_indel_avg=7.0,
+    frameshift_indel_avg=0.0,
+    sub_mutation_avg = 3.0
 )
 # add frameshift errors when delegating to contigs
 for j in 1:num_seqs
-    dataset[j+1] = copy(shared_mutation)
-    frameshift_noise_seq!(dataset[j+1], frameshift_indel_avg = 4.0)
+    dataset[j+1] = mutateSequence(shared_mutation, codon_indel_avg=1.0, frameshift_indel_avg = 3.0,sub_mutation_avg = 5.0)
 end
 write_fasta("./benchmark/performance/benchmark_input_sequences.fasta", dataset)
 msa = msa_codon_align(ref, dataset[2:end], use_seeded=true)

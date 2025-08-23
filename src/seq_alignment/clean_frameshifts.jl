@@ -34,11 +34,9 @@ seq: AT-----TA  -> cleaned_seq: ATN---NTA
 ```
 """
 function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; verbose::Bool=false)
-    # get ref sequence
-    ref = ungap(aligned_ref)
     # exception handling
     length(aligned_ref) == length(aligned_seq) || throw(ArgumentError("aligned sequences have differing lengths!"))
-    length(ref) % 3 == 0 || throw(ArgumentError("The original reference sequence (ungap(aligned_ref)) must have length divisible by 3"))
+    sum(!isgap, aligned_ref) % 3 == 0 || throw(ArgumentError("The original reference sequence (ungap(aligned_ref)) must have length divisible by 3"))
     !any(
         (base_ref == DNA_Gap) && (base_seq == DNA_Gap) for (base_ref,base_seq) in zip(aligned_ref, aligned_seq)
     ) || throw(ArgumentError("Both sequences have a gap at the same index, which therefore cannot be resolved"))
@@ -50,18 +48,17 @@ function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; ver
     end
 end
 # internal _clean_frameshifts method
-function _clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; verbose::Bool=false)
+@inbounds function _clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; verbose::Bool=false)
     # codon bookkeeping variables
     insertAddon = 0
-    ref = ungap(aligned_ref)
-    codon_length = length(ref)÷3
+    codon_length = sum(!isgap, aligned_ref)÷3
     # only used in verbose mode
     total_num_of_clean_up_operations = 0
     total_num_deletion_gaps_cleaned = 0
     total_num_insertion_gaps_cleaned = 0
     # boolean lambda functions
-    is_3gap = seq -> (seq == LongDNA{4}("---"))
-    no_gaps = seq -> !any(==(DNA_Gap), seq)
+    is_3gap = (pos1::DNA, pos2::DNA, pos3::DNA) -> (pos1 == DNA_Gap && pos2 == DNA_Gap && pos3 == DNA_Gap)
+    no_gaps = (pos1::DNA, pos2::DNA, pos3::DNA) -> !(pos1 == DNA_Gap || pos2 == DNA_Gap || pos3 == DNA_Gap)
     # initialize empty alignment
     cleaned_ref = LongDNA{4}("")
     cleaned_seq = LongDNA{4}("")
@@ -69,18 +66,20 @@ function _clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; ve
     last_alignment_index = 0
     while codon_index <= codon_length
         cur_pos = 3*(codon_index-1)+1+insertAddon
-        cur_codon_ref = aligned_ref[cur_pos:cur_pos+2]
-        cur_codon_seq = aligned_seq[cur_pos:cur_pos+2]
-        if (no_gaps(cur_codon_ref) && no_gaps(cur_codon_seq)) || is_3gap(cur_codon_seq)
-            append!(cleaned_ref, cur_codon_ref)
-            append!(cleaned_seq, cur_codon_seq)
+        if (no_gaps(aligned_ref[cur_pos], aligned_ref[cur_pos+1], aligned_ref[cur_pos+2]) && no_gaps(aligned_seq[cur_pos], aligned_seq[cur_pos+1], aligned_seq[cur_pos+2])) || is_3gap(aligned_seq[cur_pos], aligned_seq[cur_pos+1], aligned_seq[cur_pos+2])
+            for i in 0:2
+                push!(cleaned_ref, aligned_ref[cur_pos+i])
+                push!(cleaned_seq, aligned_seq[cur_pos+i])
+            end
             codon_index += 1
             last_alignment_index = cur_pos+2
             continue
-        elseif is_3gap(cur_codon_ref)
+        elseif is_3gap(aligned_ref[cur_pos], aligned_ref[cur_pos+1], aligned_ref[cur_pos+2])
             insertAddon += 3
-            append!(cleaned_ref, cur_codon_ref)
-            append!(cleaned_seq, cur_codon_seq)
+            for i in 0:2
+                push!(cleaned_ref, aligned_ref[cur_pos+i])
+                push!(cleaned_seq, aligned_seq[cur_pos+i])
+            end
             last_alignment_index = cur_pos+2
             continue
         end
@@ -88,18 +87,18 @@ function _clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; ve
         num_insertion_gaps_cleaned = 0
         num_deletion_gaps_cleaned = 0
         # look through codon and try to fix frameshift
-        for j in 1:3
+        for i in 0:2
             # insertions reletive to reference are resolved by removal
-            if cur_codon_ref[j] == DNA_Gap
+            if aligned_ref[cur_pos+i] == DNA_Gap
                 num_insertion_gaps_cleaned += 1
             # deletions relative to reference are resolved by inserting ambigious nucleotide N
-            elseif cur_codon_seq[j] == DNA_Gap
+            elseif aligned_seq[cur_pos+i] == DNA_Gap
                 num_deletion_gaps_cleaned += 1
-                push!(cleaned_ref, cur_codon_ref[j])
-                append!(cleaned_seq, LongDNA{4}("N")) # ambigious nucleotide
+                push!(cleaned_ref, aligned_ref[cur_pos+i])
+                push!(cleaned_seq, DNA_N) # ambigious nucleotide
             else
-                push!(cleaned_ref, cur_codon_ref[j])
-                push!(cleaned_seq, cur_codon_seq[j])
+                push!(cleaned_ref, aligned_ref[cur_pos+i])
+                push!(cleaned_seq, aligned_seq[cur_pos+i])
             end
         end
 
@@ -116,7 +115,7 @@ function _clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; ve
                 num_deletion_gaps_cleaned += 1
                 num_codon_bases_fixed += 1
                 push!(cleaned_ref, aligned_ref[cur_pos+2+new_needed_insertAddon])
-                append!(cleaned_seq, LongDNA{4}("N")) # ambigious nucleotide
+                push!(cleaned_seq, DNA_N) # ambigious nucleotide
             else
                 num_codon_bases_fixed += 1
                 push!(cleaned_ref, aligned_ref[cur_pos+2+new_needed_insertAddon])
@@ -125,11 +124,12 @@ function _clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; ve
         end
         last_alignment_index = cur_pos+2+new_needed_insertAddon
         # if we get 3 ambigious nucleotides inserted in a codon we replace it with the original codon deletion
-        if cleaned_seq[length(cleaned_ref)-2:end] == LongDNA{4}("NNN")
+        if cleaned_seq[length(cleaned_ref)-2] == DNA_N && cleaned_seq[length(cleaned_ref)-1] == DNA_N && cleaned_seq[end] == DNA_N
             num_deletion_gaps_cleaned -= 3
-            cleaned_seq = cleaned_seq[1:length(cleaned_ref)-3] * LongDNA{4}("---")
+            cleaned_seq[length(cleaned_ref)-2] = DNA_Gap
+            cleaned_seq[length(cleaned_ref)-1] = DNA_Gap
+            cleaned_seq[end] = DNA_Gap
         end
-
         # verbose visibility of edits made to the alignment
         if verbose && (num_insertion_gaps_cleaned != 0 || num_deletion_gaps_cleaned != 0)
             # update operation statistics
@@ -179,8 +179,10 @@ function _clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; ve
     num_insertion_gap_after_last_codon = length(aligned_ref) - last_alignment_index
     if num_insertion_gap_after_last_codon != 0
         num_extra_insertion_gaps_cleaned = num_insertion_gap_after_last_codon % 3
-        append!(cleaned_ref, aligned_ref[last_alignment_index+1:length(aligned_ref)-num_extra_insertion_gaps_cleaned])
-        append!(cleaned_seq, aligned_seq[last_alignment_index+1:length(aligned_ref)-num_extra_insertion_gaps_cleaned])
+        for idx in last_alignment_index+1:length(aligned_ref)-num_extra_insertion_gaps_cleaned
+            push!(cleaned_ref, aligned_ref[idx])
+            push!(cleaned_seq, aligned_seq[idx])
+        end
         if verbose && (num_extra_insertion_gaps_cleaned != 0)
             # add the final operations to the tally
             total_num_insertion_gaps_cleaned += num_extra_insertion_gaps_cleaned

@@ -183,8 +183,11 @@ end
         append!(resultA, alignment[1])
         append!(resultB, alignment[2])
     end
-    append!(resultA, A[kmer.posA : kmer.posA + k - 1])
-    append!(resultB, B[kmer.posB : kmer.posB + k - 1])
+    # add kmer
+    for idx in 0:k-1
+        push!(resultA, A[kmer.posA+idx])
+        push!(resultB, A[kmer.posB+idx])
+    end
     prevA = kmer.posA
     prevB = kmer.posB
     # loop thorugh rest of kmers
@@ -196,8 +199,11 @@ end
             append!(resultA, alignment[1])
             append!(resultB, alignment[2])
         end
-        append!(resultA, A[kmer.posA : kmer.posA + k - 1])
-        append!(resultB, B[kmer.posB : kmer.posB + k - 1])
+        # add kmer
+        for idx in 0:k-1
+            push!(resultA, A[kmer.posA+idx])
+            push!(resultB, A[kmer.posB+idx])
+        end 
         prevA = kmer.posA
         prevB = kmer.posB
     end

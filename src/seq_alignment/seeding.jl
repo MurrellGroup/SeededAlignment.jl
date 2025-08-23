@@ -140,8 +140,6 @@ end
     return match_score/4+(3/4)*mismatch_score, match_score
 end
 #kmer selection based on approximated nw_align score
-# TODO look for improvements here
-# TODO preallocate connector kmer_matches
 function select_kmer_path(kmerMatches::Vector{KmerMatch}, m::Int64, n::Int64, match_score_matrix::S, match_score::Float64, mismatch_score::Float64,
     vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, extension_score::Float64, k::Int64) where {X, Y, S<:Union{Nothing, Matrix{Float64}}}
     

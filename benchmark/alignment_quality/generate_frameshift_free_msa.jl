@@ -13,7 +13,7 @@ ref = generate_random_ref(seqlength÷3)
 dataset[1] = ref
 # generate shared mutations
 shared_mutation = mutateSequence(ref,
-    codon_indel_avg=3.0,
+    codon_indel_avg = 3.0,
     frameshift_indel_avg=0.0,
     sub_mutation_avg = 5.0
 )
