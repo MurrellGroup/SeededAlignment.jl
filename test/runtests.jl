@@ -79,7 +79,7 @@ include("../benchmark/noising.jl")
         @testset "2.4 test custom nucleotide substitution matrix" begin
             scoring_scheme = ScoringScheme(nucleotide_score_matrix=SeededAlignment.NUC_SUB_MATRIX)
             # should not detect frameshifts based on how B is made. 
-            aligned_A, aligned_B = nw_align(ref=A, query=B, scoring=scoring_scheme)
+            aligned_A, aligned_B = nw_align(ref=A, query=B, scoring=scoring_scheme, codon_scoring_on=true)
             @test typeof(@inferred nw_align(ref=A, query=B, scoring=scoring_scheme)) == Tuple{LongDNA{4},LongDNA{4}}
             @test ungap(aligned_A) == A && ungap(aligned_B) == B
 	        @test length(aligned_A) == length(aligned_B)
