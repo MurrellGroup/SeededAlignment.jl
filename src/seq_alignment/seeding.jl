@@ -76,7 +76,7 @@ const repetition_threshold::Int64 = 5
     end
 
     # Search B for any matching kmers
-    diagonals = fill(typemin(UInt16), m+n)
+    diagonals = fill(typemin(UInt32), m+n)
     #= diagonals[i] = the rightmost kmer start_index in A that matches with a kmer of B in diagonal i. 
     Used to avoid overlapping kmerMatches=#
 
