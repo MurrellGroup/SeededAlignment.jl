@@ -3,7 +3,7 @@
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://MurrellGroup.github.io/SeededAlignment.jl/dev/)
 [![Build Status](https://github.com/MurrellGroup/SeededAlignment.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/MurrellGroup/SeededAlignment.jl/actions/workflows/CI.yml?query=branch%3Amain)
 
-SeededAlignment.jl aims to provide a frameshift robust framework for codon alignments. It can support
+**`SeededAlignment.jl`** aims to provide a frameshift robust framework for codon alignments. It can support
 downstream analyses such as selection detection, phylogenetic inference, and evolutionary modeling. The package
 is design to be flexible and performant enough for large-scale codon alignments.
 
@@ -28,15 +28,17 @@ Pkg.add(url="https://github.com/MurrellGroup/SeededAlignment.jl")
 
 -**`nw_align`** - frameshift robust codon-level Needleman-Wunsch algorithm that detects and cleans frameshift errors.
 
-**Note:** `nw_align` and `seed_chain_align` also support De-Novo nucleotide alignments. 
+**Note:** **`nw_align`** and **`seed_chain_align`** also support De-Novo nucleotide alignments. 
 
-**FASTA Support** – `read_fasta` / `write_fasta`
+**FASTA Support** – **`read_fasta`** / **`write_fasta`**
 
 --- 
 
 ## Examples
 
 ### seed_chain_align
+
+---
 
 This is the main method for computing pairwise codon alignments. 
 
@@ -56,7 +58,11 @@ If we want to view what was cleaned up in prinouts we can run the last line agai
 codon_alignment = seed_chain_align(ref=ref_seq, query=query_seq, verbose=true)
 ```
 
+---
+
 ### clean_frameshifts
+
+---
 
 In the situation where we have a pairwise alignment that has a broken reading frame due to frameshift errors. We can clean up 
 the frameshift errors if one of the sequences is a trusted reference sequence. 
@@ -77,14 +83,15 @@ write_fasta("cleaned_codon_alignment.fasta", cleaned_alignment, seq_names=seq_na
 ```
 By default the changes are visibile in printouts just like `seed_chain_align` with verbose kwarg.
 
+---
+
 ### msa_codon_align
+
+---
 
 This method produces a reference-guided codon multiple sequence alignment that is frameshift robust. This might be helpful 
 because traditionally if a single sequence in the alignment contains a frameshift error it breaks the entire codon alignment and 
 one would have to currate a correction manually.
-
-Note that the resulting alignment will be biased by the reference sequence and might need to be supplemented if the
-intended alignment is complex.  
 
 ```julia
 using SeededAlignment
@@ -100,3 +107,5 @@ msa_codon_alignment = msa_codon_align(ref_seq, query_seqs)
 # write alignment to fasta file
 write_fasta("example_output.fasta", msa_codon_alignment, seq_names = seq_names)
 ```
+Note that the resulting alignment will be biased by the reference sequence and might need to be supplemented if the
+intended alignment is complex.  

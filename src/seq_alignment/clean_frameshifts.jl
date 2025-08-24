@@ -49,6 +49,9 @@ function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; ver
 end
 # internal _clean_frameshifts method
 @inbounds function _clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; verbose::Bool=false)
+    if verbose
+        ref = ungap(aligned_ref)
+    end
     # codon bookkeeping variables
     insertAddon = 0
     codon_length = sum(!isgap, aligned_ref)÷3
@@ -147,16 +150,24 @@ end
             if codon_index == 1
                 println("left codon is edited!")
                 println("ref: ", ref[1:3*(codon_index+1)])
-                println("original alignment_ref: ", aligned_ref[cur_pos:last_alignment_index])
-                println("original alignment_seq: ", aligned_seq[cur_pos:last_alignment_index])
+
+                print("original alignment_ref: ")
+                color_diff(aligned_ref[cur_pos:last_alignment_index],cleaned_ref[length(cleaned_ref)-2:end], second=false)
+                print("original alignment_seq: ", )
+                color_diff(aligned_seq[cur_pos:last_alignment_index],cleaned_seq[length(cleaned_ref)-2:end], second=false)
+
                 println("cleaned alignment_ref:  ", cleaned_ref[length(cleaned_ref)-2:end])
                 println("cleaned alignment_seq:  ", cleaned_seq[length(cleaned_seq)-2:end])
                 println("_____________________________________________________")
             elseif codon_index == codon_length
                 println("right codon is edited!")
                 println("ref: ", ref[3*(codon_index-2)+1:3*(codon_index)])
-                println("original alignment_ref: ", aligned_ref[cur_pos-3:last_alignment_index])
-                println("original alignment_seq: ", aligned_seq[cur_pos-3:last_alignment_index])
+
+                print("original alignment_ref: ")
+                color_diff(aligned_ref[cur_pos-3:last_alignment_index],cleaned_ref[length(cleaned_ref)-5:end], second=false)
+                print("original alignment_seq: ", )
+                color_diff(aligned_seq[cur_pos-3:last_alignment_index],cleaned_seq[length(cleaned_ref)-5:end], second=false)
+
                 println("cleaned alignment_ref:  ", cleaned_ref[length(cleaned_ref)-5:end])
                 println("cleaned alignment_seq:  ", cleaned_seq[length(cleaned_seq)-5:end])
                 println("_____________________________________________________")
