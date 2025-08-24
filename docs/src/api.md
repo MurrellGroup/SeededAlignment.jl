@@ -4,7 +4,7 @@ CurrentModule = SeededAlignment
 
 # API Reference
 
-This section provides detailed documentation for all exported types and functions in `SeededAlignment.jl`.
+This section provides detailed documentation for all exported types, functions and constants in `SeededAlignment.jl`.
 
 ## Core Methods
 
@@ -27,7 +27,7 @@ methods for reading and writing of sequence data in FASTA format.
 - [`ScoringScheme`](@ref)
 - [`LongDNA{4}`] - Array specialized for DNA from BioSequences.jl
 
-## Standard Parameters
+## Constants
 
 - [`STD_SCORING`](@ref)
 - [`STD_CODON_MOVESET`](@ref)

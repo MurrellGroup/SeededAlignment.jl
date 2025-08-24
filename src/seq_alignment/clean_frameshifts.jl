@@ -33,7 +33,7 @@ ref: ATGAACGTA  -> cleaned_ref: ATGAACGTA
 seq: AT-----TA  -> cleaned_seq: ATN---NTA
 ```
 """
-function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; verbose::Bool=false)
+function clean_frameshifts(aligned_ref::LongDNA{4}, aligned_seq::LongDNA{4}; verbose::Bool=true)
     # exception handling
     length(aligned_ref) == length(aligned_seq) || throw(ArgumentError("aligned sequences have differing lengths!"))
     sum(!isgap, aligned_ref) % 3 == 0 || throw(ArgumentError("The original reference sequence (ungap(aligned_ref)) must have length divisible by 3"))
