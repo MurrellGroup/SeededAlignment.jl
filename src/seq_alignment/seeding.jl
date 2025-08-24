@@ -9,25 +9,25 @@ end
 # Helper function and types for find_kmer_matches
 # mutable struct optimized for kmerDict
 mutable struct KmerPositions
-    p1::UInt16
-    p2::UInt16
-    p3::UInt16
-    p4::UInt16
-    p5::UInt16
+    p1::UInt32
+    p2::UInt32
+    p3::UInt32
+    p4::UInt32
+    p5::UInt32
     skip::Bool
 end
 
 # Helper: insert a new position into the first free slot
-@inline function insert!(kp::KmerPositions, pos::UInt16)
-    if kp.p1 == UInt16(0)
+@inline function insert!(kp::KmerPositions, pos::UInt32)
+    if kp.p1 == UInt32(0)
         kp.p1 = pos
-    elseif kp.p2 == UInt16(0)
+    elseif kp.p2 == UInt32(0)
         kp.p2 = pos
-    elseif kp.p3 == UInt16(0)
+    elseif kp.p3 == UInt32(0)
         kp.p3 = pos
-    elseif kp.p4 == UInt16(0)
+    elseif kp.p4 == UInt32(0)
         kp.p4 = pos
-    elseif kp.p5 == UInt16(0)
+    elseif kp.p5 == UInt32(0)
         kp.p5 = pos
     else
         # purely to set that kmer should be ignored
@@ -63,14 +63,14 @@ const repetition_threshold::Int64 = 5
         # seeds in A must obide by reading frame
         for i in 1:(m-k+1)÷3
             hash_key = encode_kmer(A, 3*(i-1)+1, k)
-            pos = UInt16(3*(i-1)+1)
+            pos = UInt32(3*(i-1)+1)
             if haskey(kmerDict, hash_key)
                 KP = kmerDict[hash_key]
                 if KP.skip == false
                     insert!(KP, pos)
                 end
             else
-                kmerDict[hash_key] = KmerPositions(pos, UInt16(0), UInt16(0), UInt16(0), UInt16(0), false)
+                kmerDict[hash_key] = KmerPositions(pos, UInt32(0), UInt32(0), UInt32(0), UInt32(0), false)
             end
         end
     end
