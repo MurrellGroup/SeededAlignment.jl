@@ -220,4 +220,164 @@ end
     return resultA, resultB
 end
 
+const VALID_AA = AminoAcid.(['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y','X'])
+# AA seed_chain_align
+function seed_chain_align(A::LongAA, B::LongAA; moveset::Moveset = STD_NOISY_MOVESET, scoring::ScoringScheme = STD_SCORING)
+    all(aa -> aa in VALID_AA, A) || throw(ArgumentError("Sequence A contains invalid amino acids! Only standard 20 amino acids plus 'X' are allowed."))
+    all(aa -> aa in VALID_AA, B) || throw(ArgumentError("Sequence B contains invalid amino acids! Only standard 20 amino acids plus 'X' are allowed."))
+    
+    _seed_chain_align(A, B, moveset, scoring)
+end
+
+@inbounds @fastmath function _seed_chain_align(A::LongAA, B::LongAA, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING)
+
+    n, m = length(A), length(B)
+    # unpack parameters
+    k = scoring.kmer_length
+    vgap_moves = moveset.vert_moves
+    hgap_moves = moveset.hor_moves
+    match_score = scoring.nucleotide_match_score
+    mismatch_score = scoring.nucleotide_mismatch_score
+    extension_score = scoring.extension_score
+    edge_ext_begin = scoring.edge_ext_begin
+    edge_ext_end = scoring.edge_ext_end
+    # seeding heuristic
+    kmerMatches = find_kmer_matches(A, B, k)
+    # revert to nw_align if sequences are too disimiliar
+    if length(kmerMatches) == 0
+        return _nw_align(A[1 : end], B[1 : end], vgap_moves, hgap_moves, extension_score, 
+        edge_ext_begin, edge_ext_end, match_score, mismatch_score)
+    end
+    # two possible seeding heuristics
+    kmerPath = select_kmer_path(kmerMatches, n, m, nothing, match_score, mismatch_score, 
+        vgap_moves, hgap_moves, extension_score, k)
+    #kmerPath = select_max_correlation_kmer_path(kmerMatches, k)
+
+    # Join kmers using needleman-wunsch
+    prevA = -k+1
+    prevB = -k+1
+    resultA = LongAA("")
+    resultB = LongAA("")
+    # handle first kmer as special case outside loop
+    kmer = kmerPath[1]
+    if !(kmer.posA == 1 && kmer.posB == 1)
+        # align without cleaning frameshifts
+        alignment = _nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, extension_score, 
+            edge_ext_begin, false, match_score, mismatch_score)
+        append!(resultA, alignment[1])
+        append!(resultB, alignment[2])
+    end
+    # add kmer
+    for idx in 0:k-1
+        push!(resultA, A[kmer.posA+idx])
+        push!(resultB, B[kmer.posB+idx])
+    end
+    prevA = kmer.posA
+    prevB = kmer.posB
+    # loop thorugh rest of kmers
+    for kmer in kmerPath[2:end]
+        if !(kmer.posA == prevA + k && kmer.posB == prevB + k)
+            # align without cleaning frameshifts
+            alignment = _nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, extension_score, 
+                false, false, match_score, mismatch_score)
+            append!(resultA, alignment[1])
+            append!(resultB, alignment[2])
+        end
+        # add kmer
+        for idx in 0:k-1
+            push!(resultA, A[kmer.posA+idx])
+            push!(resultB, B[kmer.posB+idx])
+        end 
+        prevA = kmer.posA
+        prevB = kmer.posB
+    end
+    # align the  last part of the sequences - without cleaning frameshifts
+    alignment = _nw_align(A[prevA + k : end], B[prevB + k : end], vgap_moves, hgap_moves, extension_score, 
+        false, edge_ext_end, match_score, mismatch_score)
+    append!(resultA, alignment[1])
+    append!(resultB, alignment[2])
+    # return alignment as Tuple
+    return resultA, resultB
+end
+
+# string alignment
+
+function seed_chain_align(A::String, B::String; moveset::Moveset = STD_NOISY_MOVESET, scoring::ScoringScheme = STD_SCORING)
+  
+    _seed_chain_align(A, B, moveset, scoring)
+end
+
+@inbounds @fastmath function _seed_chain_align(A::String, B::String, moveset::Moveset=STD_CODON_MOVESET, scoring::ScoringScheme=STD_SCORING, 
+    codon_scoring_on=false::Bool, do_clean_frameshifts=false::Bool, verbose=false::Bool)
+
+    n, m = length(A), length(B)
+    # unpack parameters
+    k = scoring.kmer_length
+    vgap_moves = moveset.vert_moves
+    hgap_moves = moveset.hor_moves
+    match_score = scoring.nucleotide_match_score
+    mismatch_score = scoring.nucleotide_mismatch_score
+    extension_score = scoring.extension_score
+    edge_ext_begin = scoring.edge_ext_begin
+    edge_ext_end = scoring.edge_ext_end
+    # seeding heuristic
+    kmerMatches = find_kmer_matches(A, B, k)
+    # revert to nw_align if sequences are too disimiliar
+    if length(kmerMatches) == 0
+        return _nw_align(A[1 : end], B[1 : end], vgap_moves, hgap_moves, extension_score, 
+        edge_ext_begin, edge_ext_end, match_score, mismatch_score)
+    end
+    # two possible seeding heuristics
+    kmerPath = select_kmer_path(kmerMatches, n, m, nothing, match_score, mismatch_score, 
+        vgap_moves, hgap_moves, extension_score, k)
+    #kmerPath = select_max_correlation_kmer_path(kmerMatches, k)
+
+    # Join kmers using needleman-wunsch
+    prevA = -k+1
+    prevB = -k+1
+    resultA = Char[]
+    resultB = Char[]
+    # handle first kmer as special case outside loop
+    kmer = kmerPath[1]
+    if !(kmer.posA == 1 && kmer.posB == 1)
+        # align without cleaning frameshifts
+        alignment = _nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, extension_score, 
+            edge_ext_begin, false, match_score, mismatch_score)
+        append!(resultA, alignment[1])
+        append!(resultB, alignment[2])
+    end
+    # add kmer
+    for idx in 0:k-1
+        push!(resultA, A[kmer.posA+idx])
+        push!(resultB, B[kmer.posB+idx])
+    end
+    prevA = kmer.posA
+    prevB = kmer.posB
+    # loop thorugh rest of kmers
+    for kmer in kmerPath[2:end]
+        if !(kmer.posA == prevA + k && kmer.posB == prevB + k)
+            # align without cleaning frameshifts
+            alignment = _nw_align(A[prevA + k : kmer.posA - 1], B[prevB + k : kmer.posB - 1], vgap_moves, hgap_moves, extension_score, 
+                false, false, match_score, mismatch_score)
+            append!(resultA, alignment[1])
+            append!(resultB, alignment[2])
+        end
+        # add kmer
+        for idx in 0:k-1
+            push!(resultA, A[kmer.posA+idx])
+            push!(resultB, B[kmer.posB+idx])
+        end 
+        prevA = kmer.posA
+        prevB = kmer.posB
+    end
+    # align the  last part of the sequences - without cleaning frameshifts
+    alignment = _nw_align(A[prevA + k : end], B[prevB + k : end], vgap_moves, hgap_moves, extension_score, 
+        false, edge_ext_end, match_score, mismatch_score)
+    append!(resultA, alignment[1])
+    append!(resultB, alignment[2])
+    # return alignment as Tuple
+    return String(resultA), String(resultB)
+end
+
+
 const already_warned_seed = Ref(false)

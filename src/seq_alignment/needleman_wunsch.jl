@@ -441,9 +441,285 @@ end
     # return alignment
     return aligned_A, aligned_B
 end
+# string alignment
+function nw_align(A::String, B::String; moveset::Moveset = STD_NOISY_MOVESET, scoring::ScoringScheme = STD_SCORING)
+   # unpack arguments and call the internal alignment function
+    _nw_align(
+        A, B, moveset.vert_moves, moveset.hor_moves,
+        scoring.extension_score, scoring.edge_ext_begin, scoring.edge_ext_end, scoring.nucleotide_match_score,
+        scoring.nucleotide_mismatch_score
+    )
+end
+# string alignment
+function _nw_align(A::String, B::String, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, extension_score::Float64=-0.4, 
+    edge_extension_begin=false::Bool, edge_extension_end=false::Bool, nuc_match_score::Float64=0.0, nuc_mismatch_score::Float64=-0.1) where {X, Y}
+
+    n, m = length(A), length(B)
+
+    # Offset indicies to avoid bounds-checking
+    column_offset = maximum(k -> k.step_length, hgap_moves) + 1
+    row_offset =    maximum(k -> k.step_length, vgap_moves) + 1
+    column_boundary = n + column_offset
+    row_boundary = m + row_offset
+
+    # Length of sequences and matrices are increased according to offset
+    A2 = "A"^(column_offset - 1) * A
+    B2 = "A"^(row_offset - 1) * B
+    # Initialize DP matrix
+    # The cell at [x + row_offset, y + column_offset] is the score of the best alignment of A[1 : x] with B[1 : y]
+    dp_matrix = fill(-Inf64, row_boundary, column_boundary)
+
+    # Assign score 0 to the empty alignment
+    dp_matrix[row_offset, column_offset] = 0.0
+
+    # Affine moves requires two extra DP matrices
+    vaffine_matrix = fill(-Inf64, row_boundary, column_boundary)
+    haffine_matrix = fill(-Inf64, row_boundary, column_boundary)
+    
+    # allow starting in extending
+    if edge_extension_begin
+        vaffine_matrix[row_offset,column_offset] = 0.0
+        haffine_matrix[row_offset,column_offset] = 0.0
+    end
+
+    # Main DP -step
+    for row_index ∈ row_offset : row_boundary
+        for column_index ∈ column_offset : column_boundary
+            # check score if match current pair of nucleotides
+            match_score = score_match(A2[column_index-1], B2[row_index-1], nuc_match_score, nuc_mismatch_score)
+            dp_matrix[row_index, column_index] = max(
+                dp_matrix[row_index, column_index], 
+                dp_matrix[row_index-1,column_index-1]+match_score
+            )
+            # finds the best vertical move
+            for k ∈ vgap_moves
+                    if k.extendable
+                        vaffine_matrix[row_index, column_index] = max(
+                            vaffine_matrix[row_index, column_index],
+                            vaffine_matrix[row_index - k.step_length, column_index] + extension_score * k.step_length,
+                            dp_matrix[row_index - k.step_length, column_index] + k.score
+                        )
+                    else
+                        dp_matrix[row_index,column_index] = max(
+                            dp_matrix[row_index,column_index],
+                            dp_matrix[row_index - k.step_length, column_index] + k.score
+                        )
+                    end
+            end
+
+            # finds the best horizontal move
+            for k ∈ hgap_moves
+                    if k.extendable
+                        haffine_matrix[row_index, column_index] = max(
+                            haffine_matrix[row_index, column_index],
+                            haffine_matrix[row_index, column_index - k.step_length] + extension_score * k.step_length,
+                            dp_matrix[row_index, column_index - k.step_length] + k.score
+                        )
+                    else
+                        dp_matrix[row_index,column_index] = max(
+                            dp_matrix[row_index,column_index],
+                            dp_matrix[row_index, column_index - k.step_length] + k.score
+                        )
+                    end
+            end
+
+            # find overall best move
+            dp_matrix[row_index, column_index] = max(
+                dp_matrix[row_index, column_index], 
+                haffine_matrix[row_index, column_index],
+                vaffine_matrix[row_index, column_index]
+            )
+        end
+    end
+
+    # handle ending alignment in extension state if enabled
+    if edge_extension_end
+        for row_index in row_offset : row_boundary
+            vaffine_matrix[row_boundary,column_boundary] = max(
+                vaffine_matrix[row_boundary,column_boundary],  
+                dp_matrix[row_index,column_boundary] + extension_score*(row_boundary-row_index)
+            )
+        end
+        for column_index in column_offset : column_boundary
+            haffine_matrix[row_boundary,column_boundary] = max(
+                haffine_matrix[row_boundary, column_boundary],
+                dp_matrix[row_boundary,column_index] + extension_score*(column_boundary-column_index)
+            )
+        end
+        # update end score
+        dp_matrix[row_boundary, column_boundary] = max(
+            dp_matrix[row_boundary, column_boundary], 
+            haffine_matrix[row_boundary, column_boundary],
+            vaffine_matrix[row_boundary, column_boundary]
+        )
+    end
+    # Backtracking
+    res_A = Char[]
+    res_B = Char[]
+    # Start at the final cell
+    x = column_boundary
+    y = row_boundary
+    # Flags for affine moves
+    must_move_ver = false
+    must_move_hor = false
+    # end extension backtrack
+    if edge_extension_end && x == column_boundary 
+        for i in 1:y-row_offset
+            if fast_simpler_isapprox(dp_matrix[y,x],dp_matrix[y-i,x]+i*extension_score)
+                for j ∈ 1 : i
+                    push!(res_A, '-')
+                    push!(res_B, B2[y - j])
+                end
+                y -= i
+                # do stuff
+                break
+            end
+        end
+    end
+    # end extension backtrack
+    if edge_extension_end && y == row_boundary
+        for i in 1:x-column_offset
+            if fast_simpler_isapprox(dp_matrix[y,x],dp_matrix[y,x-i]+i*extension_score)
+                for j ∈ 1:i
+                    push!(res_A, A2[x - j])
+                    push!(res_B, '-')
+                end
+                x -= i
+                # do stuff
+                break
+            end
+        end
+    end
+    # loop rest of backtrack
+    while x > column_offset || y > row_offset
+        top_sequence_pos = x-column_offset
+        if x == column_offset # first column
+            push!(res_A, '-')
+            push!(res_B, B2[y - 1])
+            y -= 1
+        elseif y == row_offset # first row
+            push!(res_A, A2[x - 1])
+            push!(res_B, '-')
+            x -= 1
+        else
+            # record previous position
+            px = x
+            py = y
+            # iterate through digonal match moves
+            if !must_move_hor && !must_move_ver 
+                # calculate total (mis-)match score
+                s = score_match(A2[x-1], B2[y-1], nuc_match_score, nuc_mismatch_score)
+                # check if the move leads to the current cell
+                if fast_simpler_isapprox(dp_matrix[y, x],dp_matrix[y - 1, x - 1] + s)
+                    # record the path
+                    push!(res_A, A2[x - 1])
+                    push!(res_B, B2[y - 1])
+                    x -= 1
+                    y -= 1
+                    continue
+                end
+            end
+
+            if !must_move_hor
+                
+                for k ∈ vgap_moves
+                    # check if the move leads to the current cell
+                    if k.extendable
+                        current_score = must_move_ver ? vaffine_matrix[y, x] : dp_matrix[y, x]
+                        can_move_affine = (fast_simpler_isapprox(current_score,vaffine_matrix[y-k.step_length, x] + extension_score * k.step_length))
+                        can_move_regular = (fast_simpler_isapprox(current_score,dp_matrix[y-k.step_length, x] + k.score))
+                    else
+                        current_score = dp_matrix[y,x]
+                        can_move_affine = (false)
+                        can_move_regular = (fast_simpler_isapprox(current_score,dp_matrix[y-k.step_length,x] + k.score))
+                    end
+                    
+                    if can_move_affine || can_move_regular
+                        for i ∈ 1 : k.step_length
+                            push!(res_A, '-')
+                            push!(res_B, B2[y - i])
+                        end
+                        y -= k.step_length
+
+                        # constrain next move 
+                        if !(y == row_offset)
+                            must_move_ver = !can_move_regular
+                        end
+                        break
+                    end
+                end
+            end
+
+            if !must_move_ver
+
+                # iterate through horizontal Move moves
+                for k ∈ hgap_moves
+                    # check if the move leads to the current cell
+                    if k.extendable
+                        current_score = must_move_hor ? haffine_matrix[y, x] : dp_matrix[y, x]
+                        can_move_affine = (fast_simpler_isapprox(current_score,haffine_matrix[y, x-k.step_length] + extension_score * k.step_length))
+                        can_move_regular = (fast_simpler_isapprox(current_score,dp_matrix[y,x-k.step_length] + k.score))
+                    else
+                        current_score = dp_matrix[y, x]
+                        can_move_affine = (false)
+                        can_move_regular = (fast_simpler_isapprox(current_score,dp_matrix[y,x-k.step_length] + k.score))
+                    end
+
+                    if can_move_affine || can_move_regular
+                        
+                        for i ∈ 1:k.step_length
+                            push!(res_A, A2[x - i])
+                            push!(res_B, '-')
+                        end
+                        x -= k.step_length
+
+                        # constrain next move
+                        if !(x == column_offset)
+                            must_move_hor = !can_move_regular
+                        end
+                        break
+                    end
+                end
+            end
+
+            # if no move was found
+            if (px == x && py == y)
+                error("Backtracking failed")
+            end
+        end
+    end
+    # full alignment
+    aligned_A = reverse(res_A)
+    aligned_B = reverse(res_B)
+    # return alignment
+    return String(aligned_A), String(aligned_B)
+end
+
+# AminoAcid alignment
+function nw_align(A::LongAA, B::LongAA; moveset::Moveset = STD_NOISY_MOVESET, scoring::ScoringScheme = STD_SCORING)
+   # unpack arguments and call the internal alignment function
+    aligned_A, aligned_B = _nw_align(
+        A, B, moveset.vert_moves, moveset.hor_moves,
+        scoring.extension_score, scoring.edge_ext_begin, scoring.edge_ext_end, scoring.nucleotide_match_score,
+        scoring.nucleotide_mismatch_score
+    )
+    return LongAA(aligned_A), LongAA(aligned_B)
+end
+
+function _nw_align(A::LongAA, B::LongAA, vgap_moves::NTuple{X,Move}, hgap_moves::NTuple{Y,Move}, extension_score::Float64=-0.4, 
+    edge_extension_begin=false::Bool, edge_extension_end=false::Bool, nuc_match_score::Float64=0.0, nuc_mismatch_score::Float64=-0.1) where {X, Y}
+
+    aligned_A, aligned_B = _nw_align(
+        string(A), String(B), vgap_moves, hgap_moves,
+        extension_score, edge_extension_begin, edge_extension_end, nuc_match_score,  nuc_mismatch_score
+    )
+    return LongAA(aligned_A), LongAA(aligned_B)
+end
+
 # specialized scoring functions
 @inline score_match(a::DNA, b::DNA, ::Nothing, match_score::Float64, mismatch_score::Float64) = (a == b) ? match_score : mismatch_score
 @inline score_match(a::DNA, b::DNA, M::Matrix{Float64}, match_score::Float64, mismatch_score::Float64) = M[toInt(a), toInt(b)]
+@inline score_match(a::Char, b::Char, match_score::Float64, mismatch_score::Float64) = (a == b) ? match_score : mismatch_score
 # Didn't give noticiable performance boost
 @inline function fast_simpler_isapprox(a::Float64, b::Float64; eps::Float64=1e-5)
     return abs(a - b) < eps

@@ -53,10 +53,10 @@ const repetition_threshold::Int64 = 5
             if haskey(kmerDict, hash_key)
                 KP = kmerDict[hash_key]
                 if KP.skip == false
-                    insert!(KP, i)
+                    insert!(KP, UInt32(i))
                 end
             else
-                kmerDict[hash_key] = KmerPositions(i,0,0,0,0, false)
+                kmerDict[hash_key] = KmerPositions(UInt32(i),UInt32(0),UInt32(0),UInt32(0),UInt32(0), false)
             end
         end
     else
@@ -109,6 +109,118 @@ const repetition_threshold::Int64 = 5
     return kmer_matches
 end
 
+# find all kmer_matches to be considered for AminoAcid sequences
+@inbounds function find_kmer_matches(A::LongAA, B::LongAA, kmer_length::Int64) 
+    # Abbreviations
+    k = kmer_length
+    m = length(A)
+    n = length(B)
+
+    # List of all kmer matches between A and B
+    kmer_matches = KmerMatch[]
+    # Produce dictionary of all kmers in A
+    kmerDict = Dict{UInt64, KmerPositions}()
+    
+    for i in 1:m-k+1
+        hash_key = encode_kmer(A, i, k)
+        if haskey(kmerDict, hash_key)
+            KP = kmerDict[hash_key]
+            if KP.skip == false
+                insert!(KP, UInt32(i))
+            end
+        else
+            kmerDict[hash_key] = KmerPositions(UInt32(i),UInt32(0),UInt32(0),UInt32(0),UInt32(0), false)
+        end
+    end
+    # Search B for any matching kmers
+    diagonals = fill(typemin(UInt32), m+n)
+    #= diagonals[i] = the rightmost kmer start_index in A that matches with a kmer of B in diagonal i. 
+    Used to avoid overlapping kmerMatches=#
+
+    #= NOTE: improvement idea if alignment quality is lacking - 
+        IDEA: find all kmerMatches on diagional i. Sort them, itterate, check if current KmerMatch overlaps with previously added KmerMatch. 
+        On the other hand this causes more kmerMatches to appear and make the alignment slower overall.
+    =#
+    for iB in 1 : n-k+1
+        hash_key = encode_kmer(B, iB, k)
+        # skips kmers which are too common in sequence A
+        if (haskey(kmerDict, hash_key) && kmerDict[hash_key].skip == false)
+            #Add found match(es) to list
+            KP = kmerDict[hash_key]
+            for iA in (KP.p1, KP.p2, KP.p3, KP.p4, KP.p5)
+                iA == 0 && break
+                diag_idx = iA - iB + n + 1
+                #= 
+                    NOTE: if iA is big early then it could impact alignment quality because it blocks 
+                    other matches along that diagonal. Remedy was suggested above. But repetition_threshold makes this less likely
+                =#
+                # sufficent condition for no overlap
+                if diagonals[diag_idx] + k <= iA
+                    push!(kmer_matches, KmerMatch(iA, iB))
+                    diagonals[diag_idx] = iA
+                end
+            end
+        end
+    end
+    
+    return kmer_matches
+end
+# find all kmer_matches for strings
+@inbounds function find_kmer_matches(A::String, B::String, kmer_length::Int64) 
+    # Abbreviations
+    k = kmer_length
+    m = length(A)
+    n = length(B)
+
+    # List of all kmer matches between A and B
+    kmer_matches = KmerMatch[]
+    # Produce dictionary of all kmers in A
+    kmerDict = Dict{String, KmerPositions}()
+    
+    for i in 1:m-k+1
+        hash_key = A[i:i+k-1]
+        if haskey(kmerDict, hash_key)
+            KP = kmerDict[hash_key]
+            if KP.skip == false
+                insert!(KP, UInt32(i))
+            end
+        else
+            kmerDict[hash_key] = KmerPositions(UInt32(i),UInt32(0),UInt32(0),UInt32(0),UInt32(0), false)
+        end
+    end
+    # Search B for any matching kmers
+    diagonals = fill(typemin(UInt32), m+n)
+    #= diagonals[i] = the rightmost kmer start_index in A that matches with a kmer of B in diagonal i. 
+    Used to avoid overlapping kmerMatches=#
+
+    #= NOTE: improvement idea if alignment quality is lacking - 
+        IDEA: find all kmerMatches on diagional i. Sort them, itterate, check if current KmerMatch overlaps with previously added KmerMatch. 
+        On the other hand this causes more kmerMatches to appear and make the alignment slower overall.
+    =#
+    for iB in 1 : n-k+1
+        hash_key = B[iB:iB+k-1]
+        # skips kmers which are too common in sequence A
+        if (haskey(kmerDict, hash_key) && kmerDict[hash_key].skip == false)
+            #Add found match(es) to list
+            KP = kmerDict[hash_key]
+            for iA in (KP.p1, KP.p2, KP.p3, KP.p4, KP.p5)
+                iA == 0 && break
+                diag_idx = iA - iB + n + 1
+                #= 
+                    NOTE: if iA is big early then it could impact alignment quality because it blocks 
+                    other matches along that diagonal. Remedy was suggested above. But repetition_threshold makes this less likely
+                =#
+                # sufficent condition for no overlap
+                if diagonals[diag_idx] + k <= iA
+                    push!(kmer_matches, KmerMatch(iA, iB))
+                    diagonals[diag_idx] = iA
+                end
+            end
+        end
+    end
+    
+    return kmer_matches
+end
 # structs and helper methods for kmer selection using approximated nw_align score
 struct Endpoint
     x::Int64
@@ -122,6 +234,15 @@ function encode_kmer(A::LongDNA{4}, start::Int64, k::Int64)
     @inbounds @simd for j in 0:k-1
         code <<= 2
         code |= trailing_zeros(BioSequences.compatbits(A[start+j]))  # .data is 0,1,2,3 for A,C,G,T
+    end
+    return code
+end
+# Hash a k-mer of amino acids into a UInt64
+function encode_kmer(A::LongAA, start::Int64, k::Int64)
+    code::UInt64 = 0
+    @inbounds @simd for j in 0:k-1
+        code <<= 5  # 5 bits per amino acid (2^5 = 32 ≥ 20)
+        code |= UInt64(BioSequences.compatbits(A[start+j]))  # .data gives 0..19 for LongAA
     end
     return code
 end

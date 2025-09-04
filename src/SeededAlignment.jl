@@ -4,6 +4,7 @@ using FASTX
 # export dna sequence datatype
 using BioSequences
 export LongDNA
+export LongAA
 export ungap
 # exports utilities
 include("utils/fasta_io.jl")

@@ -265,4 +265,72 @@ include("../benchmark/noising.jl")
             @test typeof(@inferred clean_frameshifts(A_frameshift,[B_frameshift])) == Vector{LongDNA{4}}
         end
     end
+
+    @testset "8. alignment - LongAA" begin
+        Random.seed!(42)
+        A = randseq(AminoAcidAlphabet(), 1001)
+        B = A[1:500] * A[510:600] * A[700:end]
+        aligned_A, aligned_B = nw_align(A, B)
+        # 8.1 alignment doesn't alter the underlying sequences
+        @testset "8.1 alignment doesn't alter the underlying sequences" begin
+            @test ungap(aligned_A) == A && ungap(aligned_B) == B
+        end
+        # 8.2 aligned_sequences have the same length
+        @testset "8.2 aligned_sequences have the same length" begin
+	        @test length(aligned_A) == length(aligned_B)
+        end
+        # 8.3 type inferrence
+        @testset "8.3 type inferrence" begin
+            @test typeof(@inferred nw_align(A,B)) == Tuple{LongAA,LongAA}
+        end
+        aligned_A, aligned_B = seed_chain_align(A, B)
+        # 8.4 alignment doesn't alter the underlying sequences
+        @testset "8.4 alignment doesn't alter the underlying sequences" begin
+            @test ungap(aligned_A) == A && ungap(aligned_B) == B
+        end
+        # 8.5 aligned_sequences have the same length
+        @testset "8.5 aligned_sequences have the same length" begin
+	        @test length(aligned_A) == length(aligned_B)
+        end
+        # 8.6 type inferrence
+        @testset "8.6 type inferrence" begin
+            @test typeof(@inferred seed_chain_align(A,B)) == Tuple{LongAA,LongAA}
+        end
+    end
+
+    @testset "9. alignment - string" begin
+        Random.seed!(42)
+       # Define your alphabet (any characters)
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#%^&*"
+        # Generate a random string of length 1001
+        A = join([alphabet[rand(1:end)] for _ in 1:1001])
+        # Build B by slicing and concatenating parts of A
+        B = A[1:500] * A[510:600] * A[700:end]
+        aligned_A, aligned_B = nw_align(A, B)
+        # 9.1 alignment doesn't alter the underlying sequences
+        @testset "9.1 alignment doesn't alter the underlying sequences" begin
+            @test replace(aligned_A, "-" => "") == A && replace(aligned_B, "-" => "") == B
+        end
+        # 9.2 aligned_sequences have the same length
+        @testset "9.2 aligned_sequences have the same length" begin
+	        @test length(aligned_A) == length(aligned_B)
+        end
+        # 9.3 type inferrence
+        @testset "9.3 type inferrence" begin
+            @test typeof(@inferred nw_align(A,B)) == Tuple{String,String}
+        end
+        aligned_A, aligned_B = seed_chain_align(A, B)
+        # 9.4 alignment doesn't alter the underlying sequences
+        @testset "9.4 alignment doesn't alter the underlying sequences" begin
+            @test replace(aligned_A, "-" => "") == A && replace(aligned_B, "-" => "") == B
+        end
+        # 9.5 aligned_sequences have the same length
+        @testset "9.5 aligned_sequences have the same length" begin
+	        @test length(aligned_A) == length(aligned_B)
+        end
+        # 9.6 type inferrence
+        @testset "9.6 type inferrence" begin
+            @test typeof(@inferred seed_chain_align(A,B)) == Tuple{String,String}
+        end
+    end
 end
