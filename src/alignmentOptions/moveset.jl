@@ -186,7 +186,7 @@ const STD_NOISY_MOVESET = Moveset(
 """
 const STD_NOISY_MOVESET = Moveset(
     (
-        Move(ref=false, step_length=1, score=-0.1, extendable=true),
+        Move(ref=false, step_length=1, score=-1.0, extendable=true),
         Move(ref=false, step_length=3, score=-2.5, extendable=true)
     )
 )

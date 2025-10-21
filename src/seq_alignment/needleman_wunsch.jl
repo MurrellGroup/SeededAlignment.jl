@@ -248,7 +248,7 @@ end
             )
         end
     end
-
+    # TODO confirm werid bug doesn't show up, this has the extension bug. 
     # handle ending alignment in extension state if enabled
     if edge_extension_end
         for row_index in row_offset : row_boundary
@@ -258,10 +258,13 @@ end
             )
         end
         for column_index in column_offset : column_boundary
-            haffine_matrix[row_boundary,column_boundary] = max(
-                haffine_matrix[row_boundary, column_boundary],
-                dp_matrix[row_boundary,column_index] + extension_score*(column_boundary-column_index)
-            )
+            top_sequence_pos = (column_index-column_offset)
+            if top_sequence_pos % 3 == 0
+                haffine_matrix[row_boundary,column_boundary] = max(
+                    haffine_matrix[row_boundary, column_boundary],
+                    dp_matrix[row_boundary,column_index] + extension_score*(column_boundary-column_index)
+                )
+            end
         end
         # update end score
         dp_matrix[row_boundary, column_boundary] = max(
